@@ -5,6 +5,8 @@ use synth_core::messages::{AudioMessage, GuiMessage};
 use synth_core::midi::MidiHandler;
 use synth_core::midi_file::{MidiPlayer, MidiSequence};
 use synth_core::patch::{Patch, PatchBank};
+use synth_core::vgm::VgmFile;
+use synth_core::vgm_extract;
 
 use crate::panels;
 use crate::rack_panel;
@@ -310,6 +312,55 @@ impl eframe::App for MameSynthApp {
             .show(ctx, |ui| {
                 // MIDI transport bar
                 ui.horizontal(|ui| {
+                    if ui.button("Import VGM").clicked() {
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("VGM files", &["vgm", "vgz"])
+                            .pick_file()
+                        {
+                            match VgmFile::load(&path) {
+                                Ok(vgm_file) => {
+                                    log::info!("Loaded VGM: {}", vgm_file.summary());
+                                    let extractions = vgm_extract::extract(&vgm_file);
+                                    let mut total_patches = 0;
+                                    let mut total_events = 0;
+
+                                    for ext in &extractions {
+                                        // Save extracted patches
+                                        for patch in &ext.patches {
+                                            if let Err(e) = self.patch_bank.save_patch(patch) {
+                                                log::error!("Failed to save patch: {}", e);
+                                            }
+                                            total_patches += 1;
+                                        }
+
+                                        // Load first extraction as MIDI sequence
+                                        if !ext.events.is_empty() {
+                                            let seq = MidiSequence {
+                                                events: ext.events.clone(),
+                                                duration_us: ext.duration_us,
+                                                name: format!(
+                                                    "{} ({})",
+                                                    path.file_stem()
+                                                        .map(|s| s.to_string_lossy().to_string())
+                                                        .unwrap_or_default(),
+                                                    ext.chip_name
+                                                ),
+                                            };
+                                            total_events += seq.events.len();
+                                            self.midi_player.load(seq);
+                                        }
+                                    }
+                                    log::info!(
+                                        "VGM import: {} patches, {} note events",
+                                        total_patches,
+                                        total_events
+                                    );
+                                }
+                                Err(e) => log::error!("Failed to load VGM: {}", e),
+                            }
+                        }
+                    }
+
                     if ui.button("Open MIDI").clicked() {
                         if let Some(path) = rfd::FileDialog::new()
                             .add_filter("MIDI files", &["mid", "midi"])

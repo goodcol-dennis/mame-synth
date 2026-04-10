@@ -23,6 +23,9 @@ const PARAM_DECAY: u32 = 3;
 const PARAM_SUSTAIN: u32 = 4;
 const PARAM_RELEASE: u32 = 5;
 const PARAM_VOLUME: u32 = 6;
+const PARAM_FILTER_CUTOFF: u32 = 7;
+const PARAM_FILTER_RESO: u32 = 8;
+const PARAM_FILTER_MODE: u32 = 9;
 
 pub fn sid_param_info() -> Vec<ParamInfo> {
     vec![
@@ -105,6 +108,43 @@ pub fn sid_param_info() -> Vec<ParamInfo> {
                 max: 15,
                 default: 15,
                 labels: None,
+            },
+        },
+        ParamInfo {
+            id: PARAM_FILTER_CUTOFF,
+            name: "Filter Cutoff".into(),
+            group: "Filter".into(),
+            kind: ParamKind::Continuous {
+                min: 0.0,
+                max: 2047.0,
+                default: 1024.0,
+            },
+        },
+        ParamInfo {
+            id: PARAM_FILTER_RESO,
+            name: "Resonance".into(),
+            group: "Filter".into(),
+            kind: ParamKind::Discrete {
+                min: 0,
+                max: 15,
+                default: 0,
+                labels: None,
+            },
+        },
+        ParamInfo {
+            id: PARAM_FILTER_MODE,
+            name: "Filter Mode".into(),
+            group: "Filter".into(),
+            kind: ParamKind::Discrete {
+                min: 0,
+                max: 3,
+                default: 0,
+                labels: Some(vec![
+                    "Off".into(),
+                    "Low Pass".into(),
+                    "Band Pass".into(),
+                    "High Pass".into(),
+                ]),
             },
         },
     ]
@@ -312,6 +352,12 @@ pub struct Sid6581 {
     decay: u8,
     sustain: u8,
     release: u8,
+    // State-variable filter (12dB/oct)
+    filter_cutoff: u16, // 0-2047 (11-bit)
+    filter_reso: u8,    // 0-15
+    filter_mode: u8,    // 0=off, 1=LP, 2=BP, 3=HP
+    filter_lp: f32,     // low-pass state
+    filter_bp: f32,     // band-pass state
 }
 
 impl Sid6581 {
@@ -328,6 +374,11 @@ impl Sid6581 {
             decay: 4,
             sustain: 10,
             release: 4,
+            filter_cutoff: 1024,
+            filter_reso: 0,
+            filter_mode: 0,
+            filter_lp: 0.0,
+            filter_bp: 0.0,
         }
     }
 
@@ -337,11 +388,35 @@ impl Sid6581 {
         }
     }
 
-    fn mix_sample(&self) -> f32 {
+    fn mix_and_filter(&mut self) -> f32 {
         let mut out = 0.0f32;
         for voice in &self.voices {
             out += voice.output();
         }
+
+        // Apply state-variable filter if enabled
+        if self.filter_mode > 0 {
+            // Convert cutoff register to frequency coefficient
+            // SID filter: Fc = cutoff * (clock / (6.28 * 2^20))
+            // Simplified: map 0-2047 to ~30Hz-12kHz
+            let fc = (self.filter_cutoff as f32 / 2047.0).clamp(0.001, 0.999);
+            let f = 2.0 * std::f32::consts::PI * fc * 0.25; // scaled for stability
+                                                            // Resonance: Q = 1/(1 - reso/17)
+            let q = 1.0 - (self.filter_reso as f32 / 17.0);
+
+            // State-variable filter update
+            self.filter_lp += f * self.filter_bp;
+            let hp = out - self.filter_lp - q * self.filter_bp;
+            self.filter_bp += f * hp;
+
+            out = match self.filter_mode {
+                1 => self.filter_lp, // Low pass
+                2 => self.filter_bp, // Band pass
+                3 => hp,             // High pass
+                _ => out,
+            };
+        }
+
         // Apply master volume and normalize
         out * (self.master_volume as f32 / 15.0) * 0.4
     }
@@ -411,6 +486,15 @@ impl SoundChip for Sid6581 {
             PARAM_VOLUME => {
                 self.master_volume = (value as u8).min(15);
             }
+            PARAM_FILTER_CUTOFF => {
+                self.filter_cutoff = (value as u16).min(2047);
+            }
+            PARAM_FILTER_RESO => {
+                self.filter_reso = (value as u8).min(15);
+            }
+            PARAM_FILTER_MODE => {
+                self.filter_mode = (value as u8).min(3);
+            }
             _ => {}
         }
     }
@@ -429,6 +513,9 @@ impl SoundChip for Sid6581 {
             PARAM_SUSTAIN => self.sustain as f32,
             PARAM_RELEASE => self.release as f32,
             PARAM_VOLUME => self.master_volume as f32,
+            PARAM_FILTER_CUTOFF => self.filter_cutoff as f32,
+            PARAM_FILTER_RESO => self.filter_reso as f32,
+            PARAM_FILTER_MODE => self.filter_mode as f32,
             _ => 0.0,
         }
     }
@@ -465,7 +552,7 @@ impl SoundChip for Sid6581 {
                 self.tick();
                 self.phase_accumulator -= 1.0;
             }
-            let s = self.mix_sample();
+            let s = self.mix_and_filter();
             sample.left = s;
             sample.right = s;
         }
@@ -474,6 +561,8 @@ impl SoundChip for Sid6581 {
     fn reset(&mut self) {
         self.voices = [Voice::new(), Voice::new(), Voice::new()];
         self.phase_accumulator = 0.0;
+        self.filter_lp = 0.0;
+        self.filter_bp = 0.0;
     }
 }
 

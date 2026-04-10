@@ -10,6 +10,7 @@ pub mod ricoh2a03;
 pub mod sid6581;
 pub mod sn76489;
 pub mod vgm;
+pub mod vgm_extract;
 pub mod voice;
 pub mod ym2151;
 mod ym2151_ffi;

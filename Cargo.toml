@@ -19,5 +19,9 @@ log = { workspace = true }
 env_logger = { workspace = true }
 rtrb = "0.3"
 
+[[bin]]
+name = "mame-synth-extract"
+path = "src/extract.rs"
+
 [dev-dependencies]
 libc = "0.2"
