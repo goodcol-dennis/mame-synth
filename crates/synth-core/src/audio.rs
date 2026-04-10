@@ -133,7 +133,9 @@ fn audio_callback(state: &mut AudioState, output: &mut [f32]) {
     // Generate samples
     let num_frames = output.len() / 2;
     if state.sample_buffer.len() < num_frames {
-        state.sample_buffer.resize(num_frames, StereoSample::default());
+        state
+            .sample_buffer
+            .resize(num_frames, StereoSample::default());
     }
 
     let buf = &mut state.sample_buffer[..num_frames];

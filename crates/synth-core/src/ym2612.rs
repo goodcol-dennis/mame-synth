@@ -242,11 +242,7 @@ impl Ym2612 {
 
         for (op, &offset) in op_offsets.iter().enumerate() {
             // DT1/MUL
-            self.write_reg(
-                0,
-                0x30 + offset,
-                (self.op_dt[op] << 4) | self.op_mul[op],
-            );
+            self.write_reg(0, 0x30 + offset, (self.op_dt[op] << 4) | self.op_mul[op]);
             // Total Level
             self.write_reg(0, 0x40 + offset, self.op_tl[op]);
             // RS/AR
@@ -256,11 +252,7 @@ impl Ym2612 {
             // D2R
             self.write_reg(0, 0x70 + offset, self.op_d2r[op]);
             // SL/RR
-            self.write_reg(
-                0,
-                0x80 + offset,
-                (self.op_sl[op] << 4) | self.op_rr[op],
-            );
+            self.write_reg(0, 0x80 + offset, (self.op_sl[op] << 4) | self.op_rr[op]);
         }
     }
 
@@ -276,7 +268,6 @@ impl Ym2612 {
             right: right as f32 / 8192.0,
         }
     }
-
 
     fn apply_operator_param(&self, op: usize, param_offset: u32) {
         // Apply to channel 0 only for now (all channels share the same patch)
@@ -357,7 +348,7 @@ impl SoundChip for Ym2612 {
                     self.write_reg(0, 0x22, 0x08 | self.lfo_rate);
                 }
             }
-            id if id >= 100 && id < 500 => {
+            id if (100..500).contains(&id) => {
                 let op = ((id - 100) / 100) as usize;
                 let offset = (id - 100) % 100;
                 if op < 4 {
@@ -392,7 +383,7 @@ impl SoundChip for Ym2612 {
                 }
             }
             PARAM_LFO_RATE => self.lfo_rate as f32,
-            id if id >= 100 && id < 500 => {
+            id if (100..500).contains(&id) => {
                 let op = ((id - 100) / 100) as usize;
                 let offset = (id - 100) % 100;
                 if op < 4 {
@@ -420,12 +411,19 @@ impl SoundChip for Ym2612 {
     }
 
     fn voice_on(&mut self, voice: usize, note: u8, velocity: u8, detune_cents: f32) {
-        if voice >= 6 { return; }
+        if voice >= 6 {
+            return;
+        }
         let ch = voice;
-        let freq_hz = 440.0 * 2.0f64.powf((note as f64 - 69.0 + detune_cents as f64 / 100.0) / 12.0);
+        let freq_hz =
+            440.0 * 2.0f64.powf((note as f64 - 69.0 + detune_cents as f64 / 100.0) / 12.0);
         let (fnum, block) = freq_hz_to_fnum_block(freq_hz);
 
-        let (port, base_ch) = if ch < 3 { (0u8, ch as u8) } else { (1u8, (ch - 3) as u8) };
+        let (port, base_ch) = if ch < 3 {
+            (0u8, ch as u8)
+        } else {
+            (1u8, (ch - 3) as u8)
+        };
 
         // Write frequency
         self.write_reg(port, 0xA4 + base_ch, (block << 3) | (fnum >> 8) as u8);
@@ -435,12 +433,20 @@ impl SoundChip for Ym2612 {
         let op_offsets: [u8; 4] = [0, 8, 4, 12];
         for (op, &op_off) in op_offsets.iter().enumerate() {
             let reg_offset = base_ch + op_off;
-            self.write_reg(port, 0x30 + reg_offset, (self.op_dt[op] << 4) | self.op_mul[op]);
+            self.write_reg(
+                port,
+                0x30 + reg_offset,
+                (self.op_dt[op] << 4) | self.op_mul[op],
+            );
             self.write_reg(port, 0x40 + reg_offset, self.op_tl[op]);
             self.write_reg(port, 0x50 + reg_offset, self.op_ar[op]);
             self.write_reg(port, 0x60 + reg_offset, self.op_d1r[op]);
             self.write_reg(port, 0x70 + reg_offset, self.op_d2r[op]);
-            self.write_reg(port, 0x80 + reg_offset, (self.op_sl[op] << 4) | self.op_rr[op]);
+            self.write_reg(
+                port,
+                0x80 + reg_offset,
+                (self.op_sl[op] << 4) | self.op_rr[op],
+            );
         }
         self.write_reg(port, 0xB0 + base_ch, (self.feedback << 3) | self.algorithm);
         self.write_reg(port, 0xB4 + base_ch, 0xC0);
@@ -456,7 +462,9 @@ impl SoundChip for Ym2612 {
     }
 
     fn voice_off(&mut self, voice: usize) {
-        if voice >= 6 { return; }
+        if voice >= 6 {
+            return;
+        }
         self.write_reg(0, 0x28, voice as u8);
         self.active_notes[voice] = None;
     }

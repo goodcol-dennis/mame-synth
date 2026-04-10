@@ -130,22 +130,22 @@ enum EnvState {
 #[derive(Debug, Clone)]
 struct Voice {
     // Oscillator
-    frequency: u16,     // 16-bit frequency register
+    frequency: u16, // 16-bit frequency register
     waveform: Waveform,
-    pulse_width: u16,   // 12-bit pulse width (0-4095)
-    accumulator: u32,   // 24-bit phase accumulator
+    pulse_width: u16, // 12-bit pulse width (0-4095)
+    accumulator: u32, // 24-bit phase accumulator
     // Noise LFSR (23-bit)
     noise_lfsr: u32,
     noise_output: u8,
     // ADSR envelope
-    attack: u8,         // 0-15
-    decay: u8,          // 0-15
-    sustain: u8,        // 0-15 (maps to sustain level)
-    release: u8,        // 0-15
+    attack: u8,  // 0-15
+    decay: u8,   // 0-15
+    sustain: u8, // 0-15 (maps to sustain level)
+    release: u8, // 0-15
     env_state: EnvState,
-    env_counter: u32,   // countdown to next envelope step
-    env_level: u8,      // current envelope level 0-255
-    gate: bool,         // key on/off
+    env_counter: u32, // countdown to next envelope step
+    env_level: u8,    // current envelope level 0-255
+    gate: bool,       // key on/off
     // MIDI tracking
     midi_note: Option<u8>,
 }
@@ -183,16 +183,14 @@ impl Voice {
             let feedback = bit22 ^ bit17;
             self.noise_lfsr = ((self.noise_lfsr << 1) | feedback) & 0x7FFFFF;
             // Output is bits 22,20,16,13,11,7,4,2
-            self.noise_output = (
-                ((self.noise_lfsr >> 22) & 1) << 7 |
-                ((self.noise_lfsr >> 20) & 1) << 6 |
-                ((self.noise_lfsr >> 16) & 1) << 5 |
-                ((self.noise_lfsr >> 13) & 1) << 4 |
-                ((self.noise_lfsr >> 11) & 1) << 3 |
-                ((self.noise_lfsr >> 7) & 1) << 2 |
-                ((self.noise_lfsr >> 4) & 1) << 1 |
-                ((self.noise_lfsr >> 2) & 1)
-            ) as u8;
+            self.noise_output = (((self.noise_lfsr >> 22) & 1) << 7
+                | ((self.noise_lfsr >> 20) & 1) << 6
+                | ((self.noise_lfsr >> 16) & 1) << 5
+                | ((self.noise_lfsr >> 13) & 1) << 4
+                | ((self.noise_lfsr >> 11) & 1) << 3
+                | ((self.noise_lfsr >> 7) & 1) << 2
+                | ((self.noise_lfsr >> 4) & 1) << 1
+                | ((self.noise_lfsr >> 2) & 1)) as u8;
         }
 
         // Clock envelope
@@ -210,7 +208,7 @@ impl Voice {
                 self.env_counter = ATTACK_RATES[self.attack as usize];
                 if self.env_level < 255 {
                     self.env_level += 1;
-                    if self.env_level >= 255 {
+                    if self.env_level == 255 {
                         self.env_level = 255;
                         self.env_state = EnvState::Decay;
                         self.env_counter = DECAY_RELEASE_RATES[self.decay as usize];
@@ -219,7 +217,7 @@ impl Voice {
             }
             EnvState::Decay => {
                 self.env_counter = DECAY_RELEASE_RATES[self.decay as usize];
-                let sustain_level = self.sustain as u8 * 17; // 0-15 -> 0-255
+                let sustain_level = self.sustain * 17; // 0-15 -> 0-255
                 if self.env_level > sustain_level {
                     self.env_level -= 1;
                     if self.env_level <= sustain_level {
@@ -230,7 +228,7 @@ impl Voice {
             }
             EnvState::Sustain => {
                 // Hold at sustain level while gate is on
-                let sustain_level = self.sustain as u8 * 17;
+                let sustain_level = self.sustain * 17;
                 self.env_level = sustain_level;
             }
             EnvState::Release => {
@@ -358,7 +356,6 @@ impl Sid6581 {
     }
 }
 
-
 impl SoundChip for Sid6581 {
     fn chip_id(&self) -> ChipId {
         ChipId::Sid6581
@@ -441,8 +438,11 @@ impl SoundChip for Sid6581 {
     }
 
     fn voice_on(&mut self, voice: usize, note: u8, _velocity: u8, detune_cents: f32) {
-        if voice >= 3 { return; }
-        let freq_hz = 440.0 * 2.0f64.powf((note as f64 - 69.0 + detune_cents as f64 / 100.0) / 12.0);
+        if voice >= 3 {
+            return;
+        }
+        let freq_hz =
+            440.0 * 2.0f64.powf((note as f64 - 69.0 + detune_cents as f64 / 100.0) / 12.0);
         let freq = ((freq_hz * 16777216.0 / CLOCK_PAL).round() as u32).min(0xFFFF) as u16;
         self.apply_patch(voice);
         self.voices[voice].frequency = freq;
@@ -451,7 +451,9 @@ impl SoundChip for Sid6581 {
     }
 
     fn voice_off(&mut self, voice: usize) {
-        if voice >= 3 { return; }
+        if voice >= 3 {
+            return;
+        }
         self.voices[voice].gate_off();
         self.voices[voice].midi_note = None;
     }
@@ -472,5 +474,105 @@ impl SoundChip for Sid6581 {
     fn reset(&mut self) {
         self.voices = [Voice::new(), Voice::new(), Voice::new()];
         self.phase_accumulator = 0.0;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_chip() -> Sid6581 {
+        Sid6581::new(44100)
+    }
+
+    #[test]
+    fn silent_after_creation() {
+        let mut chip = make_chip();
+        let mut buf = vec![StereoSample::default(); 256];
+        chip.generate_samples(&mut buf);
+        assert!(buf.iter().all(|s| s.left == 0.0 && s.right == 0.0));
+    }
+
+    #[test]
+    fn produces_sound_after_voice_on() {
+        let mut chip = make_chip();
+        chip.voice_on(0, 60, 127, 0.0);
+        // Generate enough samples for the attack to produce output
+        let mut buf = vec![StereoSample::default(); 4096];
+        chip.generate_samples(&mut buf);
+        let peak = buf.iter().map(|s| s.left.abs()).fold(0.0f32, f32::max);
+        assert!(peak > 0.01, "Expected audible output, got peak={}", peak);
+    }
+
+    #[test]
+    fn envelope_produces_output_then_decays() {
+        let mut chip = make_chip();
+        chip.set_param(PARAM_ATTACK, 0.0); // fastest attack
+        chip.set_param(PARAM_SUSTAIN, 8.0); // mid sustain
+        chip.voice_on(0, 60, 127, 0.0);
+        // Should produce non-zero output during attack+sustain
+        let mut buf = vec![StereoSample::default(); 4096];
+        chip.generate_samples(&mut buf);
+        let peak = buf.iter().map(|s| s.left.abs()).fold(0.0f32, f32::max);
+        assert!(peak > 0.01, "Should produce output during envelope, got peak={}", peak);
+    }
+
+    #[test]
+    fn waveform_switch_changes_output() {
+        let mut chip1 = make_chip();
+        let mut chip2 = make_chip();
+        chip1.set_param(PARAM_WAVEFORM, 0.0); // triangle
+        chip2.set_param(PARAM_WAVEFORM, 1.0); // sawtooth
+        chip1.voice_on(0, 60, 127, 0.0);
+        chip2.voice_on(0, 60, 127, 0.0);
+        let mut buf1 = vec![StereoSample::default(); 2048];
+        let mut buf2 = vec![StereoSample::default(); 2048];
+        chip1.generate_samples(&mut buf1);
+        chip2.generate_samples(&mut buf2);
+        let differs = buf1
+            .iter()
+            .zip(buf2.iter())
+            .any(|(a, b)| (a.left - b.left).abs() > 0.001);
+        assert!(differs, "Different waveforms should produce different output");
+    }
+
+    #[test]
+    fn voice_off_triggers_release() {
+        let mut chip = make_chip();
+        chip.set_param(PARAM_ATTACK, 0.0);
+        chip.set_param(PARAM_RELEASE, 0.0); // fast release
+        chip.voice_on(0, 60, 127, 0.0);
+        let mut buf = vec![StereoSample::default(); 4096];
+        chip.generate_samples(&mut buf); // let attack finish
+        chip.voice_off(0);
+        let mut buf2 = vec![StereoSample::default(); 8192];
+        chip.generate_samples(&mut buf2);
+        // Later samples should be quieter
+        let early_peak = buf2[..1024]
+            .iter()
+            .map(|s| s.left.abs())
+            .fold(0.0f32, f32::max);
+        let late_peak = buf2[6000..]
+            .iter()
+            .map(|s| s.left.abs())
+            .fold(0.0f32, f32::max);
+        assert!(
+            late_peak <= early_peak,
+            "Release should decay: early={} late={}",
+            early_peak,
+            late_peak
+        );
+    }
+
+    #[test]
+    fn reset_silences_output() {
+        let mut chip = make_chip();
+        chip.voice_on(0, 60, 127, 0.0);
+        let mut buf = vec![StereoSample::default(); 2048];
+        chip.generate_samples(&mut buf);
+        chip.reset();
+        let mut buf2 = vec![StereoSample::default(); 256];
+        chip.generate_samples(&mut buf2);
+        assert!(buf2.iter().all(|s| s.left == 0.0 && s.right == 0.0));
     }
 }

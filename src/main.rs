@@ -10,8 +10,7 @@ fn main() -> eframe::Result<()> {
     let (gui_tx, gui_rx) = rtrb::RingBuffer::<GuiMessage>::new(256);
 
     // Start the audio engine (opens cpal stream immediately)
-    let _audio_engine = AudioEngine::new(audio_rx, gui_tx)
-        .expect("Failed to start audio engine");
+    let _audio_engine = AudioEngine::new(audio_rx, gui_tx).expect("Failed to start audio engine");
 
     log::info!("Audio engine started");
 
@@ -25,9 +24,5 @@ fn main() -> eframe::Result<()> {
         ..Default::default()
     };
 
-    eframe::run_native(
-        "mame-synth",
-        options,
-        Box::new(|_cc| Ok(Box::new(app))),
-    )
+    eframe::run_native("mame-synth", options, Box::new(|_cc| Ok(Box::new(app))))
 }

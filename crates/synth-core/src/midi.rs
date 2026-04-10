@@ -3,13 +3,14 @@ use rtrb::Producer;
 
 use crate::messages::AudioMessage;
 
+#[derive(Default)]
 pub struct MidiHandler {
     connection: Option<MidiInputConnection<()>>,
 }
 
 impl MidiHandler {
     pub fn new() -> Self {
-        MidiHandler { connection: None }
+        Self::default()
     }
 
     /// Scan for available MIDI input ports. Returns port names.
@@ -36,12 +37,7 @@ impl MidiHandler {
         }
         let port = &ports[port_index];
 
-        match midi_in.connect(
-            port,
-            "mame-synth-input",
-            midi_callback(producer),
-            (),
-        ) {
+        match midi_in.connect(port, "mame-synth-input", midi_callback(producer), ()) {
             Ok(conn) => {
                 self.connection = Some(conn);
                 true
@@ -62,9 +58,7 @@ impl MidiHandler {
     }
 }
 
-fn midi_callback(
-    mut producer: Producer<AudioMessage>,
-) -> impl FnMut(u64, &[u8], &mut ()) + Send {
+fn midi_callback(mut producer: Producer<AudioMessage>) -> impl FnMut(u64, &[u8], &mut ()) + Send {
     move |_timestamp, data, _| {
         if let Some(msg) = parse_midi(data) {
             let _ = producer.push(msg);

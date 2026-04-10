@@ -76,14 +76,14 @@ pub fn show_algorithm_diagram(ui: &mut egui::Ui, algorithm: u8) {
             let to = egui::pos2(x + spacing - box_size.x / 2.0, y_center);
             // Only draw line if ops are connected in this algorithm
             let connected = match algorithm {
-                0 => true,           // 1->2->3->4 (serial)
-                1 => i != 0,         // (1+2)->3->4
-                2 => i != 0,         // (1+2+3)->4
+                0 => true,             // 1->2->3->4 (serial)
+                1 => i != 0,           // (1+2)->3->4
+                2 => i != 0,           // (1+2+3)->4
                 3 => i == 0 || i == 2, // 1->2, 3->4
                 4 => i == 0 || i == 2, // 1->2, 3->4 (parallel out)
-                5 => i == 0,         // 1->2, 3, 4
-                6 => i == 0,         // 1->2, 3, 4
-                7 => false,          // all parallel
+                5 => i == 0,           // 1->2, 3, 4
+                6 => i == 0,           // 1->2, 3, 4
+                7 => false,            // all parallel
                 _ => false,
             };
             if connected {

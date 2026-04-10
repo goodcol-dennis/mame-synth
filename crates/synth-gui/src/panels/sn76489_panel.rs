@@ -4,11 +4,7 @@ use egui;
 /// For now, the generic rack panel handles everything; this adds a chip description header.
 pub fn show_chip_header(ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
-        ui.label(
-            egui::RichText::new("SN76489 PSG")
-                .strong()
-                .size(16.0),
-        );
+        ui.label(egui::RichText::new("SN76489 PSG").strong().size(16.0));
         ui.label(
             egui::RichText::new("3 Square + 1 Noise")
                 .size(12.0)

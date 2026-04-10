@@ -7,7 +7,7 @@ use synth_core::midi::MidiHandler;
 use crate::panels;
 use crate::rack_panel;
 use crate::theme;
-use crate::widgets::keyboard::{PianoKeyboard};
+use crate::widgets::keyboard::PianoKeyboard;
 use crate::widgets::vu_meter::VuMeter;
 
 pub struct MameSynthApp {
@@ -33,10 +33,7 @@ pub struct MameSynthApp {
 }
 
 impl MameSynthApp {
-    pub fn new(
-        audio_tx: Producer<AudioMessage>,
-        gui_rx: Consumer<GuiMessage>,
-    ) -> Self {
+    pub fn new(audio_tx: Producer<AudioMessage>, gui_rx: Consumer<GuiMessage>) -> Self {
         let active_chip = ChipId::Sn76489;
         let param_infos = param_info_for_chip(active_chip);
         let param_values: Vec<f32> = param_infos.iter().map(|p| p.kind.default_value()).collect();
@@ -67,7 +64,11 @@ impl MameSynthApp {
         }
         self.active_chip = new_chip;
         self.param_infos = param_info_for_chip(new_chip);
-        self.param_values = self.param_infos.iter().map(|p| p.kind.default_value()).collect();
+        self.param_values = self
+            .param_infos
+            .iter()
+            .map(|p| p.kind.default_value())
+            .collect();
         let _ = self.audio_tx.push(AudioMessage::SwitchChip(new_chip));
 
         // Release any held notes
@@ -91,18 +92,18 @@ impl MameSynthApp {
     fn handle_computer_keyboard(&mut self, ctx: &egui::Context) {
         // Map computer keys to MIDI notes
         let key_map: &[(egui::Key, u8)] = &[
-            (egui::Key::Z, 0),   // C
-            (egui::Key::S, 1),   // C#
-            (egui::Key::X, 2),   // D
-            (egui::Key::D, 3),   // D#
-            (egui::Key::C, 4),   // E
-            (egui::Key::V, 5),   // F
-            (egui::Key::G, 6),   // F#
-            (egui::Key::B, 7),   // G
-            (egui::Key::H, 8),   // G#
-            (egui::Key::N, 9),   // A
-            (egui::Key::J, 10),  // A#
-            (egui::Key::M, 11),  // B
+            (egui::Key::Z, 0),  // C
+            (egui::Key::S, 1),  // C#
+            (egui::Key::X, 2),  // D
+            (egui::Key::D, 3),  // D#
+            (egui::Key::C, 4),  // E
+            (egui::Key::V, 5),  // F
+            (egui::Key::G, 6),  // F#
+            (egui::Key::B, 7),  // G
+            (egui::Key::H, 8),  // G#
+            (egui::Key::N, 9),  // A
+            (egui::Key::J, 10), // A#
+            (egui::Key::M, 11), // B
         ];
 
         // Process raw input events for keyboard.
@@ -111,7 +112,13 @@ impl MameSynthApp {
         let raw_events: Vec<(u8, bool, bool)> = ctx.input(|input| {
             let mut evts = Vec::new();
             for event in &input.events {
-                if let egui::Event::Key { key, pressed, repeat, .. } = event {
+                if let egui::Event::Key {
+                    key,
+                    pressed,
+                    repeat,
+                    ..
+                } = event
+                {
                     for (mapped_key, semitone) in key_map {
                         if key == mapped_key {
                             let midi_note = octave * 12 + semitone;
@@ -124,12 +131,17 @@ impl MameSynthApp {
         });
 
         if !raw_events.is_empty() {
-            let desc: Vec<String> = raw_events.iter().map(|(n, p, r)| {
-                format!("{}{}{}",
-                    if *p { "+" } else { "-" },
-                    n,
-                    if *r { "R" } else { "" })
-            }).collect();
+            let desc: Vec<String> = raw_events
+                .iter()
+                .map(|(n, p, r)| {
+                    format!(
+                        "{}{}{}",
+                        if *p { "+" } else { "-" },
+                        n,
+                        if *r { "R" } else { "" }
+                    )
+                })
+                .collect();
             log::info!("Raw events: {}", desc.join(" "));
         }
 
@@ -150,14 +162,21 @@ impl MameSynthApp {
                 }
             } else if !pressed && self.held_keys.contains(&midi_note) {
                 // Check if there's also a press for this note in the same frame
-                let also_pressed = raw_events.iter().any(|&(n, p, r)| n == midi_note && p && !r);
+                let also_pressed = raw_events
+                    .iter()
+                    .any(|&(n, p, r)| n == midi_note && p && !r);
                 if also_pressed {
                     // Both press and release in same frame — keep it ON
-                    log::info!("Suppressing release for {} (press in same frame)", midi_note);
+                    log::info!(
+                        "Suppressing release for {} (press in same frame)",
+                        midi_note
+                    );
                     continue;
                 }
                 self.held_keys.retain(|&n| n != midi_note);
-                let _ = self.audio_tx.push(AudioMessage::NoteOff { note: midi_note });
+                let _ = self
+                    .audio_tx
+                    .push(AudioMessage::NoteOff { note: midi_note });
                 log::info!("Sent NoteOff {}", midi_note);
             }
         }
@@ -204,12 +223,18 @@ impl eframe::App for MameSynthApp {
                     .selected_text(current_name)
                     .width(200.0)
                     .show_ui(ui, |ui| {
-                        if ui.selectable_label(self.selected_midi_port.is_none(), "(none)").clicked() {
+                        if ui
+                            .selectable_label(self.selected_midi_port.is_none(), "(none)")
+                            .clicked()
+                        {
                             self.midi_handler.disconnect();
                             self.selected_midi_port = None;
                         }
                         for (i, name) in self.midi_ports.iter().enumerate() {
-                            if ui.selectable_label(self.selected_midi_port == Some(i), name).clicked() {
+                            if ui
+                                .selectable_label(self.selected_midi_port == Some(i), name)
+                                .clicked()
+                            {
                                 // Need a new producer for this MIDI connection
                                 // For now, MIDI uses the same audio_tx — but rtrb is SPSC,
                                 // so we'll need to address this. For v0.1, skip MIDI connection
@@ -240,11 +265,16 @@ impl eframe::App for MameSynthApp {
                     .width(80.0)
                     .show_ui(ui, |ui| {
                         for (i, name) in mode_names.iter().enumerate() {
-                            if ui.selectable_label(self.voice_mode_index == i, *name).clicked() {
+                            if ui
+                                .selectable_label(self.voice_mode_index == i, *name)
+                                .clicked()
+                            {
                                 self.voice_mode_index = i;
                                 let mode = match i {
                                     1 => VoiceMode::Mono,
-                                    2 => VoiceMode::Unison { detune_cents: self.unison_detune },
+                                    2 => VoiceMode::Unison {
+                                        detune_cents: self.unison_detune,
+                                    },
                                     _ => VoiceMode::Poly,
                                 };
                                 let _ = self.audio_tx.push(AudioMessage::SetVoiceMode(mode));
@@ -255,14 +285,18 @@ impl eframe::App for MameSynthApp {
                 if self.voice_mode_index == 2 {
                     ui.label("Detune:");
                     let prev = self.unison_detune;
-                    ui.add(egui::DragValue::new(&mut self.unison_detune)
-                        .range(0.0..=50.0)
-                        .speed(0.5)
-                        .suffix(" ct"));
+                    ui.add(
+                        egui::DragValue::new(&mut self.unison_detune)
+                            .range(0.0..=50.0)
+                            .speed(0.5)
+                            .suffix(" ct"),
+                    );
                     if (self.unison_detune - prev).abs() > 0.1 {
-                        let _ = self.audio_tx.push(AudioMessage::SetVoiceMode(
-                            VoiceMode::Unison { detune_cents: self.unison_detune }
-                        ));
+                        let _ = self
+                            .audio_tx
+                            .push(AudioMessage::SetVoiceMode(VoiceMode::Unison {
+                                detune_cents: self.unison_detune,
+                            }));
                     }
                 }
             });
@@ -306,13 +340,8 @@ impl eframe::App for MameSynthApp {
             ui.horizontal(|ui| {
                 for chip in ChipId::all() {
                     let selected = *chip == self.active_chip;
-                    let text = egui::RichText::new(chip.display_name())
-                        .size(14.0)
-                        .strong();
-                    if ui
-                        .selectable_label(selected, text)
-                        .clicked()
-                    {
+                    let text = egui::RichText::new(chip.display_name()).size(14.0).strong();
+                    if ui.selectable_label(selected, text).clicked() {
                         self.switch_chip(*chip);
                     }
                 }

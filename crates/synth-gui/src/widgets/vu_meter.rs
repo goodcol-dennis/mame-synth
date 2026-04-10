@@ -27,7 +27,8 @@ impl<'a> Widget for VuMeter<'a> {
             // Level bar
             let level = self.level.clamp(0.0, 1.0);
             let bar_width = rect.width() * level;
-            let bar_rect = egui::Rect::from_min_size(rect.min, egui::vec2(bar_width, rect.height()));
+            let bar_rect =
+                egui::Rect::from_min_size(rect.min, egui::vec2(bar_width, rect.height()));
 
             // Color gradient: green -> yellow -> red
             let color = if level < 0.6 {

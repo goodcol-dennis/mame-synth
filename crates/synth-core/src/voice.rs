@@ -35,7 +35,8 @@ impl VoiceAllocator {
     }
 
     pub fn resize(&mut self, num_voices: usize) {
-        self.slots.resize(num_voices, VoiceSlot { note: None, age: 0 });
+        self.slots
+            .resize(num_voices, VoiceSlot { note: None, age: 0 });
     }
 
     /// Returns list of (voice_index, detune_cents) to trigger.
@@ -46,12 +47,18 @@ impl VoiceAllocator {
                 self.note_stack.retain(|&n| n != note);
                 self.note_stack.push(note);
                 // Always use voice 0
-                self.slots[0] = VoiceSlot { note: Some(note), age: self.age_counter };
+                self.slots[0] = VoiceSlot {
+                    note: Some(note),
+                    age: self.age_counter,
+                };
                 vec![(0, 0.0)]
             }
             VoiceMode::Poly => {
                 let voice = self.find_free_or_steal();
-                self.slots[voice] = VoiceSlot { note: Some(note), age: self.age_counter };
+                self.slots[voice] = VoiceSlot {
+                    note: Some(note),
+                    age: self.age_counter,
+                };
                 vec![(voice, 0.0)]
             }
             VoiceMode::Unison { detune_cents } => {
@@ -65,7 +72,10 @@ impl VoiceAllocator {
                         let t = i as f32 / (n - 1) as f32; // 0.0 to 1.0
                         (t - 0.5) * 2.0 * detune_cents
                     };
-                    self.slots[i] = VoiceSlot { note: Some(note), age: self.age_counter };
+                    self.slots[i] = VoiceSlot {
+                        note: Some(note),
+                        age: self.age_counter,
+                    };
                     result.push((i, detune));
                 }
                 result
@@ -228,7 +238,8 @@ impl ChipBank {
 
         if self.chips.len() > 1 {
             // Additional chips mix into the output
-            self.mix_buffer.resize(output.len(), StereoSample::default());
+            self.mix_buffer
+                .resize(output.len(), StereoSample::default());
             for chip in &mut self.chips[1..] {
                 chip.generate_samples(&mut self.mix_buffer);
                 for (out, mix) in output.iter_mut().zip(self.mix_buffer.iter()) {
@@ -249,5 +260,122 @@ impl ChipBank {
         for chip in &mut self.chips {
             chip.reset();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_allocator(voices: usize) -> VoiceAllocator {
+        VoiceAllocator::new(voices)
+    }
+
+    // --- Poly mode ---
+
+    #[test]
+    fn poly_assigns_different_voices() {
+        let mut alloc = make_allocator(3);
+        let v1 = alloc.note_on(60);
+        let v2 = alloc.note_on(64);
+        let v3 = alloc.note_on(67);
+        assert_eq!(v1.len(), 1);
+        assert_eq!(v2.len(), 1);
+        assert_eq!(v3.len(), 1);
+        assert_ne!(v1[0].0, v2[0].0);
+        assert_ne!(v2[0].0, v3[0].0);
+    }
+
+    #[test]
+    fn poly_steals_oldest_when_full() {
+        let mut alloc = make_allocator(2);
+        let v1 = alloc.note_on(60);
+        let _v2 = alloc.note_on(64);
+        let v3 = alloc.note_on(67); // should steal v1's voice
+        assert_eq!(v3[0].0, v1[0].0);
+    }
+
+    #[test]
+    fn poly_reuses_released_voice() {
+        let mut alloc = make_allocator(2);
+        alloc.note_on(60);
+        alloc.note_on(64);
+        alloc.note_off(60); // free voice 0
+        let v3 = alloc.note_on(67);
+        assert_eq!(v3[0].0, 0); // should reuse voice 0
+    }
+
+    #[test]
+    fn poly_note_off_returns_correct_voice() {
+        let mut alloc = make_allocator(3);
+        alloc.note_on(60);
+        alloc.note_on(64);
+        alloc.note_on(67);
+        let released = alloc.note_off(64);
+        assert_eq!(released.len(), 1);
+        assert_eq!(released[0], 1);
+    }
+
+    // --- Mono mode ---
+
+    #[test]
+    fn mono_always_uses_voice_0() {
+        let mut alloc = make_allocator(3);
+        alloc.set_mode(VoiceMode::Mono);
+        let v1 = alloc.note_on(60);
+        let v2 = alloc.note_on(64);
+        assert_eq!(v1[0].0, 0);
+        assert_eq!(v2[0].0, 0);
+    }
+
+    #[test]
+    fn mono_retrigger_on_release() {
+        let mut alloc = make_allocator(3);
+        alloc.set_mode(VoiceMode::Mono);
+        alloc.note_on(60);
+        alloc.note_on(64);
+        let released = alloc.note_off(64);
+        assert!(released.is_empty()); // no release — retrigger instead
+        assert_eq!(alloc.mono_retrigger_note(), Some(60));
+    }
+
+    #[test]
+    fn mono_releases_when_stack_empty() {
+        let mut alloc = make_allocator(3);
+        alloc.set_mode(VoiceMode::Mono);
+        alloc.note_on(60);
+        let released = alloc.note_off(60);
+        assert_eq!(released, vec![0]);
+        assert_eq!(alloc.mono_retrigger_note(), None);
+    }
+
+    // --- Unison mode ---
+
+    #[test]
+    fn unison_triggers_all_voices() {
+        let mut alloc = make_allocator(3);
+        alloc.set_mode(VoiceMode::Unison { detune_cents: 10.0 });
+        let voices = alloc.note_on(60);
+        assert_eq!(voices.len(), 3);
+    }
+
+    #[test]
+    fn unison_detune_spread_symmetric() {
+        let mut alloc = make_allocator(3);
+        alloc.set_mode(VoiceMode::Unison { detune_cents: 10.0 });
+        let voices = alloc.note_on(60);
+        let detunes: Vec<f32> = voices.iter().map(|(_, d)| *d).collect();
+        assert!((detunes[0] - (-10.0)).abs() < 0.01);
+        assert!((detunes[1] - 0.0).abs() < 0.01);
+        assert!((detunes[2] - 10.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn unison_releases_all_voices() {
+        let mut alloc = make_allocator(3);
+        alloc.set_mode(VoiceMode::Unison { detune_cents: 10.0 });
+        alloc.note_on(60);
+        let released = alloc.note_off(60);
+        assert_eq!(released.len(), 3);
     }
 }

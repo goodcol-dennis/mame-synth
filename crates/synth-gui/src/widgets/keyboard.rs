@@ -3,7 +3,6 @@ use egui::{self, Sense};
 use crate::theme;
 
 const WHITE_KEYS_PER_OCTAVE: usize = 7;
-const KEYS_PER_OCTAVE: usize = 12;
 
 // Which notes in an octave are black keys
 const IS_BLACK: [bool; 12] = [
@@ -28,11 +27,7 @@ impl PianoKeyboard {
         }
     }
 
-    pub fn show(
-        &self,
-        ui: &mut egui::Ui,
-        held_keys: &[u8],
-    ) -> KeyboardResult {
+    pub fn show(&self, ui: &mut egui::Ui, held_keys: &[u8]) -> KeyboardResult {
         let mut result = KeyboardResult {
             note_on: None,
             note_off: None,
@@ -68,13 +63,12 @@ impl PianoKeyboard {
         // White keys first
         let mut white_idx = 0;
         for octave in 0..self.num_octaves {
-            for semitone in 0..KEYS_PER_OCTAVE {
-                if IS_BLACK[semitone] {
+            for (semitone, &is_black) in IS_BLACK.iter().enumerate() {
+                if is_black {
                     continue;
                 }
                 let x = rect.left() + white_idx as f32 * key_width;
-                let midi_note =
-                    (self.base_octave + octave) * 12 + semitone as u8;
+                let midi_note = (self.base_octave + octave) * 12 + semitone as u8;
                 keys.push(KeyRect {
                     rect: egui::Rect::from_min_size(
                         egui::pos2(x, rect.top()),
@@ -90,12 +84,11 @@ impl PianoKeyboard {
         // Black keys (drawn on top)
         white_idx = 0;
         for octave in 0..self.num_octaves {
-            for semitone in 0..KEYS_PER_OCTAVE {
-                if IS_BLACK[semitone] {
+            for (semitone, &is_black) in IS_BLACK.iter().enumerate() {
+                if is_black {
                     // Black keys are positioned between white keys
                     let x = rect.left() + white_idx as f32 * key_width - black_width / 2.0;
-                    let midi_note =
-                        (self.base_octave + octave) * 12 + semitone as u8;
+                    let midi_note = (self.base_octave + octave) * 12 + semitone as u8;
                     keys.push(KeyRect {
                         rect: egui::Rect::from_min_size(
                             egui::pos2(x, rect.top()),
@@ -152,7 +145,12 @@ impl PianoKeyboard {
                 theme::KEY_WHITE
             };
             painter.rect_filled(key.rect.shrink(0.5), 2.0, fill);
-            painter.rect_stroke(key.rect.shrink(0.5), 2.0, egui::Stroke::new(1.0, egui::Color32::from_gray(100)), egui::StrokeKind::Outside);
+            painter.rect_stroke(
+                key.rect.shrink(0.5),
+                2.0,
+                egui::Stroke::new(1.0, egui::Color32::from_gray(100)),
+                egui::StrokeKind::Outside,
+            );
         }
 
         // Draw black keys on top

@@ -6,9 +6,9 @@ const CLOCK_DIVIDER: u32 = 16;
 // Volume attenuation table: 2dB per step, index 15 = silence
 fn build_volume_table() -> [f32; 16] {
     let mut table = [0.0f32; 16];
-    for i in 0..15 {
+    for (i, entry) in table[..15].iter_mut().enumerate() {
         // Each step is -2dB; 0 = full volume
-        table[i] = 10.0f32.powf(-2.0 * i as f32 / 20.0);
+        *entry = 10.0f32.powf(-2.0 * i as f32 / 20.0);
     }
     table[15] = 0.0; // silence
     table
@@ -120,7 +120,7 @@ impl ToneChannel {
 #[derive(Debug, Clone)]
 struct NoiseChannel {
     volume: u8,
-    shift_rate: u8,   // 0-3
+    shift_rate: u8,    // 0-3
     white_noise: bool, // true = white, false = periodic
     lfsr: u16,
     counter: u16,
@@ -141,10 +141,10 @@ impl NoiseChannel {
 
     fn shift_value(&self) -> u16 {
         match self.shift_rate {
-            0 => 0x10,  // N/512
-            1 => 0x20,  // N/1024
-            2 => 0x40,  // N/2048
-            _ => 0,     // Tone 3 frequency (handled externally)
+            0 => 0x10, // N/512
+            1 => 0x20, // N/1024
+            2 => 0x40, // N/2048
+            _ => 0,    // Tone 3 frequency (handled externally)
         }
     }
 
@@ -162,7 +162,7 @@ impl NoiseChannel {
             // Clock the LFSR
             let feedback = if self.white_noise {
                 // White noise: XOR of bits 0 and 3
-                ((self.lfsr & 1) ^ ((self.lfsr >> 3) & 1)) as u16
+                (self.lfsr & 1) ^ ((self.lfsr >> 3) & 1)
             } else {
                 // Periodic: bit 0 only
                 self.lfsr & 1
@@ -216,7 +216,6 @@ impl Sn76489 {
         // Mix: scale up for audible output
         out * 0.5
     }
-
 }
 
 impl SoundChip for Sn76489 {
@@ -263,8 +262,11 @@ impl SoundChip for Sn76489 {
     }
 
     fn voice_on(&mut self, voice: usize, note: u8, velocity: u8, detune_cents: f32) {
-        if voice >= 3 { return; }
-        let freq_hz = 440.0 * 2.0f64.powf((note as f64 - 69.0 + detune_cents as f64 / 100.0) / 12.0);
+        if voice >= 3 {
+            return;
+        }
+        let freq_hz =
+            440.0 * 2.0f64.powf((note as f64 - 69.0 + detune_cents as f64 / 100.0) / 12.0);
         let n = (CLOCK_NTSC as f64 / (2.0 * CLOCK_DIVIDER as f64 * freq_hz)).round() as u16;
         let freq_reg = n.clamp(1, 1023);
         let attenuation = 15 - ((velocity as u16 * 15) / 127) as u8;
@@ -273,7 +275,9 @@ impl SoundChip for Sn76489 {
     }
 
     fn voice_off(&mut self, voice: usize) {
-        if voice >= 3 { return; }
+        if voice >= 3 {
+            return;
+        }
         self.tones[voice].volume = 15;
     }
 
@@ -297,5 +301,92 @@ impl SoundChip for Sn76489 {
         }
         self.noise = NoiseChannel::new();
         self.phase_accumulator = 0.0;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_chip() -> Sn76489 {
+        Sn76489::new(44100)
+    }
+
+    #[test]
+    fn silent_after_creation() {
+        let mut chip = make_chip();
+        let mut buf = vec![StereoSample::default(); 256];
+        chip.generate_samples(&mut buf);
+        assert!(buf.iter().all(|s| s.left == 0.0 && s.right == 0.0));
+    }
+
+    #[test]
+    fn produces_sound_after_voice_on() {
+        let mut chip = make_chip();
+        chip.voice_on(0, 60, 127, 0.0); // middle C, max velocity
+        let mut buf = vec![StereoSample::default(); 1024];
+        chip.generate_samples(&mut buf);
+        let peak = buf.iter().map(|s| s.left.abs()).fold(0.0f32, f32::max);
+        assert!(peak > 0.01, "Expected audible output, got peak={}", peak);
+    }
+
+    #[test]
+    fn silent_after_voice_off() {
+        let mut chip = make_chip();
+        chip.voice_on(0, 60, 127, 0.0);
+        let mut buf = vec![StereoSample::default(); 256];
+        chip.generate_samples(&mut buf);
+        chip.voice_off(0);
+        // Generate more samples — should be silent
+        let mut buf2 = vec![StereoSample::default(); 256];
+        chip.generate_samples(&mut buf2);
+        assert!(buf2.iter().all(|s| s.left == 0.0 && s.right == 0.0));
+    }
+
+    #[test]
+    fn reset_silences_output() {
+        let mut chip = make_chip();
+        chip.voice_on(0, 60, 127, 0.0);
+        let mut buf = vec![StereoSample::default(); 256];
+        chip.generate_samples(&mut buf);
+        chip.reset();
+        let mut buf2 = vec![StereoSample::default(); 256];
+        chip.generate_samples(&mut buf2);
+        assert!(buf2.iter().all(|s| s.left == 0.0 && s.right == 0.0));
+    }
+
+    #[test]
+    fn three_voices_independent() {
+        let mut chip = make_chip();
+        chip.voice_on(0, 60, 127, 0.0);
+        chip.voice_on(1, 64, 127, 0.0);
+        chip.voice_on(2, 67, 127, 0.0);
+        let mut buf = vec![StereoSample::default(); 512];
+        chip.generate_samples(&mut buf);
+        let peak = buf.iter().map(|s| s.left.abs()).fold(0.0f32, f32::max);
+        assert!(peak > 0.05, "Three voices should be louder");
+    }
+
+    #[test]
+    fn detune_changes_frequency() {
+        let mut chip1 = make_chip();
+        let mut chip2 = make_chip();
+        chip1.voice_on(0, 60, 127, 0.0);
+        chip2.voice_on(0, 60, 127, 50.0); // 50 cents sharp
+        // They should produce different sample patterns
+        let mut buf1 = vec![StereoSample::default(); 512];
+        let mut buf2 = vec![StereoSample::default(); 512];
+        chip1.generate_samples(&mut buf1);
+        chip2.generate_samples(&mut buf2);
+        let differs = buf1.iter().zip(buf2.iter()).any(|(a, b)| a.left != b.left);
+        assert!(differs, "Detuned voice should produce different samples");
+    }
+
+    #[test]
+    fn volume_table_correct() {
+        let table = build_volume_table();
+        assert_eq!(table[15], 0.0); // silence
+        assert!(table[0] > table[1]); // decreasing
+        assert!(table[14] > 0.0); // still audible at step 14
     }
 }

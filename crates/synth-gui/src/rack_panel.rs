@@ -15,7 +15,10 @@ pub fn render_rack_panel(
     // Group parameters by their group name (preserve insertion order)
     let mut groups: Vec<(&str, Vec<usize>)> = Vec::new();
     for (idx, info) in param_infos.iter().enumerate() {
-        if let Some(group) = groups.iter_mut().find(|(name, _)| *name == info.group.as_str()) {
+        if let Some(group) = groups
+            .iter_mut()
+            .find(|(name, _)| *name == info.group.as_str())
+        {
             group.1.push(idx);
         } else {
             groups.push((info.group.as_str(), vec![idx]));
@@ -54,7 +57,9 @@ fn render_param_control(ui: &mut egui::Ui, info: &ParamInfo, value: &mut f32) ->
         ParamKind::Continuous { min, max, .. } => {
             ui.add(Knob::new(value, *min, *max, &info.name));
         }
-        ParamKind::Discrete { min, max, labels, .. } => {
+        ParamKind::Discrete {
+            min, max, labels, ..
+        } => {
             if let Some(labels) = labels {
                 // Combo box for labeled discrete params
                 ui.vertical(|ui| {

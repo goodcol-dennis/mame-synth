@@ -62,11 +62,7 @@ impl<'a> Widget for Knob<'a> {
 
             // Background circle
             painter.circle_filled(center, radius, theme::KNOB_BG);
-            painter.circle_stroke(
-                center,
-                radius,
-                egui::Stroke::new(2.0, theme::KNOB_RING),
-            );
+            painter.circle_stroke(center, radius, egui::Stroke::new(2.0, theme::KNOB_RING));
 
             // Arc from start angle to current value
             let normalized = (*self.value - self.min) / (self.max - self.min);
@@ -92,10 +88,7 @@ impl<'a> Widget for Knob<'a> {
 
             // Indicator line
             let tip = center + egui::vec2(end_angle.cos(), end_angle.sin()) * (radius - 6.0);
-            painter.line_segment(
-                [center, tip],
-                egui::Stroke::new(2.0, theme::KNOB_INDICATOR),
-            );
+            painter.line_segment([center, tip], egui::Stroke::new(2.0, theme::KNOB_INDICATOR));
 
             // Value text inside knob
             let value_text = if self.is_discrete {
