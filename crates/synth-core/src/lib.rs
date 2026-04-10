@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod ay8910;
 pub mod chip;
+pub mod macros;
 pub mod messages;
 pub mod midi;
 pub mod midi_file;
