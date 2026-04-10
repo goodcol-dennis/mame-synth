@@ -23,6 +23,7 @@ struct AudioState {
     gui_producer: Producer<GuiMessage>,
     sample_buffer: Vec<StereoSample>,
     sample_counter: u32,
+    first_callback: bool,
     peak_left: f32,
     peak_right: f32,
 }
@@ -73,10 +74,42 @@ impl AudioEngine {
             default_config.sample_format()
         );
 
-        let config = cpal::StreamConfig {
-            channels: 2,
-            sample_rate: cpal::SampleRate(sample_rate),
-            buffer_size: cpal::BufferSize::Default,
+        // Try progressively larger buffer sizes until one works
+        let buffer_sizes = [128, 256, 512, 1024];
+        let mut chosen_size = None;
+        for &size in &buffer_sizes {
+            let test_config = cpal::StreamConfig {
+                channels: 2,
+                sample_rate: cpal::SampleRate(sample_rate),
+                buffer_size: cpal::BufferSize::Fixed(size),
+            };
+            if device
+                .build_output_stream(&test_config, |_: &mut [f32], _| {}, |_| {}, None)
+                .is_ok()
+            {
+                chosen_size = Some(size);
+                break;
+            }
+        }
+
+        let config = if let Some(size) = chosen_size {
+            log::info!(
+                "Audio buffer: {} frames ({:.1}ms latency)",
+                size,
+                size as f64 / sample_rate as f64 * 1000.0
+            );
+            cpal::StreamConfig {
+                channels: 2,
+                sample_rate: cpal::SampleRate(sample_rate),
+                buffer_size: cpal::BufferSize::Fixed(size),
+            }
+        } else {
+            log::info!("No fixed buffer size worked, using default");
+            cpal::StreamConfig {
+                channels: 2,
+                sample_rate: cpal::SampleRate(sample_rate),
+                buffer_size: cpal::BufferSize::Default,
+            }
         };
 
         let mut state = AudioState {
@@ -91,6 +124,7 @@ impl AudioEngine {
             sample_counter: 0,
             peak_left: 0.0,
             peak_right: 0.0,
+            first_callback: true,
         };
 
         let stream = device.build_output_stream(
@@ -117,6 +151,16 @@ impl AudioEngine {
 }
 
 fn audio_callback(state: &mut AudioState, output: &mut [f32]) {
+    if state.first_callback {
+        state.first_callback = false;
+        let frames = output.len() / 2;
+        eprintln!(
+            "[AUDIO] Buffer: {} frames ({:.1}ms latency)",
+            frames,
+            frames as f64 / 44100.0 * 1000.0
+        );
+    }
+
     // Drain all pending messages (non-blocking)
     while let Ok(msg) = state.consumer.pop() {
         match msg {
