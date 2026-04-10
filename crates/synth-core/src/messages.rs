@@ -18,6 +18,8 @@ pub enum AudioMessage {
     SetVoiceMode(VoiceMode),
     /// Reset the active chip.
     Reset,
+    /// Set number of chip instances in the active bank (1-4).
+    SetChipCount(u8),
 }
 
 /// Messages from audio thread back to GUI (for visualization).

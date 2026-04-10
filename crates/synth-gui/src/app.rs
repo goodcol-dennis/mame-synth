@@ -35,12 +35,30 @@ pub struct MameSynthApp {
     pub(crate) theme_applied: bool,
     pub(crate) voice_mode_index: usize, // 0=Poly, 1=Mono, 2=Unison
     pub(crate) unison_detune: f32,
+    pub(crate) chip_count: u8,
     pub(crate) mouse_note: Option<u8>,
     pub(crate) patch_bank: PatchBank,
     pub(crate) selected_patch: Option<usize>,
     pub(crate) save_patch_name: String,
     pub(crate) show_save_dialog: bool,
     pub(crate) midi_player: MidiPlayer,
+}
+
+fn voices_per_chip(chip: synth_core::chip::ChipId) -> u8 {
+    use synth_core::chip::ChipId;
+    match chip {
+        ChipId::Sn76489 => 3,
+        ChipId::Ym2612 => 6,
+        ChipId::Sid6581 => 3,
+        ChipId::Ay8910 => 3,
+        ChipId::Ricoh2a03 => 4,
+        ChipId::Pokey => 4,
+        ChipId::Ym2151 => 8,
+        ChipId::Ym3812 => 9,
+        ChipId::Ymf262 => 18,
+        ChipId::Scc => 5,
+        ChipId::NamcoWsg => 3,
+    }
 }
 
 fn dirs() -> std::path::PathBuf {
@@ -76,6 +94,7 @@ impl MameSynthApp {
             theme_applied: false,
             voice_mode_index: 0,
             unison_detune: 15.0,
+            chip_count: 1,
             mouse_note: None,
             patch_bank: {
                 let dir = dirs();
@@ -101,6 +120,7 @@ impl MameSynthApp {
             return;
         }
         self.active_chip = new_chip;
+        self.chip_count = 1;
         self.param_infos = param_info_for_chip(new_chip);
         self.param_values = self
             .param_infos
@@ -315,6 +335,27 @@ impl eframe::App for MameSynthApp {
                             }));
                     }
                 }
+
+                ui.separator();
+                let vpc = voices_per_chip(self.active_chip);
+                let total = self.chip_count as u16 * vpc as u16;
+                ui.label(format!("Chips: {}", self.chip_count));
+                if ui.button("-").clicked() && self.chip_count > 1 {
+                    self.chip_count -= 1;
+                    let _ = self
+                        .audio_tx
+                        .push(AudioMessage::SetChipCount(self.chip_count));
+                }
+                if ui.button("+").clicked() && self.chip_count < 4 {
+                    self.chip_count += 1;
+                    let _ = self
+                        .audio_tx
+                        .push(AudioMessage::SetChipCount(self.chip_count));
+                }
+                ui.label(format!(
+                    "({} × {} = {} voices)",
+                    self.chip_count, vpc, total
+                ));
             });
         });
 

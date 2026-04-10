@@ -26,6 +26,7 @@ struct AudioState {
     first_callback: bool,
     peak_left: f32,
     peak_right: f32,
+    sample_rate: u32,
 }
 
 pub struct AudioEngine {
@@ -125,6 +126,7 @@ impl AudioEngine {
             peak_left: 0.0,
             peak_right: 0.0,
             first_callback: true,
+            sample_rate,
         };
 
         let stream = device.build_output_stream(
@@ -184,6 +186,11 @@ fn audio_callback(state: &mut AudioState, output: &mut [f32]) {
             }
             AudioMessage::SetVoiceMode(mode) => {
                 state.banks[state.active_bank_index].set_voice_mode(mode);
+            }
+            AudioMessage::SetChipCount(count) => {
+                let chip_id = state.banks[state.active_bank_index].chip_id();
+                let new_bank = create_bank(chip_id, count as usize, state.sample_rate);
+                state.banks[state.active_bank_index] = new_bank;
             }
             AudioMessage::PitchBend { .. } => {}
         }
