@@ -427,8 +427,15 @@ impl eframe::App for MameSynthApp {
                                 self.midi_player.pause();
                                 self.all_notes_off();
                             }
-                        } else if ui.button("Play").clicked() {
-                            self.midi_player.play();
+                        } else {
+                            let label = if self.midi_player.position_us() > 0 {
+                                "Resume"
+                            } else {
+                                "Play"
+                            };
+                            if ui.button(label).clicked() {
+                                self.midi_player.play();
+                            }
                         }
                         if ui.button("Stop").clicked() {
                             self.midi_player.stop();
