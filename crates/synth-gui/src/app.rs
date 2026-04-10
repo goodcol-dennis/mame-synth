@@ -3,6 +3,7 @@ use rtrb::{Consumer, Producer};
 use synth_core::chip::{param_info_for_chip, ChipId, VoiceMode};
 use synth_core::messages::{AudioMessage, GuiMessage};
 use synth_core::midi::MidiHandler;
+use synth_core::patch::{Patch, PatchBank};
 
 use crate::panels;
 use crate::rack_panel;
@@ -30,7 +31,21 @@ pub struct MameSynthApp {
     theme_applied: bool,
     voice_mode_index: usize, // 0=Poly, 1=Mono, 2=Unison
     unison_detune: f32,
-    mouse_note: Option<u8>, // currently held note from mouse click on keyboard
+    mouse_note: Option<u8>,
+    patch_bank: PatchBank,
+    selected_patch: Option<usize>,
+    save_patch_name: String,
+    show_save_dialog: bool,
+}
+
+fn dirs() -> std::path::PathBuf {
+    let base = std::env::var("XDG_DATA_HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+            std::path::PathBuf::from(home).join(".local/share")
+        });
+    base.join("mame-synth/patches")
 }
 
 impl MameSynthApp {
@@ -57,6 +72,15 @@ impl MameSynthApp {
             voice_mode_index: 0,
             unison_detune: 15.0,
             mouse_note: None,
+            patch_bank: {
+                let dir = dirs();
+                let mut bank = PatchBank::new(dir);
+                bank.ensure_factory_presets();
+                bank
+            },
+            selected_patch: None,
+            save_patch_name: String::new(),
+            show_save_dialog: false,
         }
     }
 
@@ -76,6 +100,53 @@ impl MameSynthApp {
         // Release any held notes
         for note in self.held_keys.drain(..) {
             let _ = self.audio_tx.push(AudioMessage::NoteOff { note });
+        }
+    }
+
+    fn load_patch(&mut self, patch: &Patch) {
+        // Switch chip if needed
+        if let Some(chip_id) = patch.chip_id() {
+            if chip_id != self.active_chip {
+                self.switch_chip(chip_id);
+            }
+        }
+
+        // Apply voice mode
+        let mode = patch.voice_mode();
+        let _ = self.audio_tx.push(AudioMessage::SetVoiceMode(mode));
+        match mode {
+            VoiceMode::Mono => self.voice_mode_index = 1,
+            VoiceMode::Poly => self.voice_mode_index = 0,
+            VoiceMode::Unison { detune_cents } => {
+                self.voice_mode_index = 2;
+                self.unison_detune = detune_cents;
+            }
+        }
+
+        // Apply params
+        for (i, info) in self.param_infos.iter().enumerate() {
+            if let Some(val) = patch.get_param(info.id) {
+                self.param_values[i] = val;
+                let _ = self.audio_tx.push(AudioMessage::SetParam {
+                    param_id: info.id,
+                    value: val,
+                });
+            }
+        }
+    }
+
+    fn save_current_patch(&mut self, name: &str) {
+        let param_ids: Vec<u32> = self.param_infos.iter().map(|p| p.id).collect();
+        let mode = match self.voice_mode_index {
+            1 => VoiceMode::Mono,
+            2 => VoiceMode::Unison {
+                detune_cents: self.unison_detune,
+            },
+            _ => VoiceMode::Poly,
+        };
+        let patch = Patch::from_state(name, self.active_chip, mode, &param_ids, &self.param_values);
+        if let Err(e) = self.patch_bank.save_patch(&patch) {
+            log::error!("Failed to save patch: {}", e);
         }
     }
 
@@ -492,14 +563,90 @@ impl eframe::App for MameSynthApp {
             });
 
         // Central panel: chip selector + rack
+        // Save patch dialog (modal-ish)
+        if self.show_save_dialog {
+            egui::Window::new("Save Patch")
+                .collapsible(false)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Name:");
+                        ui.text_edit_singleline(&mut self.save_patch_name);
+                    });
+                    ui.horizontal(|ui| {
+                        if ui.button("Save").clicked() && !self.save_patch_name.is_empty() {
+                            let name = self.save_patch_name.clone();
+                            self.save_current_patch(&name);
+                            self.show_save_dialog = false;
+                            self.save_patch_name.clear();
+                        }
+                        if ui.button("Cancel").clicked() {
+                            self.show_save_dialog = false;
+                        }
+                    });
+                });
+        }
+
         egui::CentralPanel::default().show(ctx, |ui| {
-            // Chip selector
+            // Chip selector + patch selector row
             ui.horizontal(|ui| {
                 for chip in ChipId::all() {
                     let selected = *chip == self.active_chip;
                     let text = egui::RichText::new(chip.display_name()).size(14.0).strong();
                     if ui.selectable_label(selected, text).clicked() {
                         self.switch_chip(*chip);
+                        self.selected_patch = None;
+                    }
+                }
+
+                ui.separator();
+
+                // Patch selector
+                let patch_name = self
+                    .selected_patch
+                    .and_then(|i| self.patch_bank.list().get(i))
+                    .map(|(name, _)| name.clone())
+                    .unwrap_or_else(|| "(init)".into());
+                let patches: Vec<(usize, String)> = self
+                    .patch_bank
+                    .list()
+                    .iter()
+                    .enumerate()
+                    .map(|(i, (name, _))| (i, name.clone()))
+                    .collect();
+                let mut load_index: Option<usize> = None;
+                egui::ComboBox::from_id_salt("patch_selector")
+                    .selected_text(&patch_name)
+                    .width(150.0)
+                    .show_ui(ui, |ui| {
+                        if ui
+                            .selectable_label(self.selected_patch.is_none(), "(init)")
+                            .clicked()
+                        {
+                            self.selected_patch = None;
+                        }
+                        for (i, name) in &patches {
+                            if ui
+                                .selectable_label(self.selected_patch == Some(*i), name.as_str())
+                                .clicked()
+                            {
+                                load_index = Some(*i);
+                            }
+                        }
+                    });
+                // Apply patch load outside the combo closure
+                if let Some(idx) = load_index {
+                    self.selected_patch = Some(idx);
+                    if let Some(patch) = self.patch_bank.load_patch(idx) {
+                        self.load_patch(&patch);
+                    }
+                }
+
+                if ui.button("Save").clicked() {
+                    self.show_save_dialog = true;
+                    self.save_patch_name = patch_name.to_string();
+                    if self.save_patch_name == "(init)" {
+                        self.save_patch_name.clear();
                     }
                 }
             });
