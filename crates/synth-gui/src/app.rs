@@ -3,6 +3,7 @@ use rtrb::{Consumer, Producer};
 use synth_core::chip::{param_info_for_chip, ChipId, VoiceMode};
 use synth_core::messages::{AudioMessage, GuiMessage};
 use synth_core::midi::MidiHandler;
+use synth_core::midi_file::{MidiPlayer, MidiSequence};
 use synth_core::patch::{Patch, PatchBank};
 
 use crate::panels;
@@ -36,6 +37,7 @@ pub struct MameSynthApp {
     selected_patch: Option<usize>,
     save_patch_name: String,
     show_save_dialog: bool,
+    midi_player: MidiPlayer,
 }
 
 fn dirs() -> std::path::PathBuf {
@@ -81,6 +83,7 @@ impl MameSynthApp {
             selected_patch: None,
             save_patch_name: String::new(),
             show_save_dialog: false,
+            midi_player: MidiPlayer::new(),
         }
     }
 
@@ -426,7 +429,20 @@ impl eframe::App for MameSynthApp {
         self.peak_left *= decay;
         self.peak_right *= decay;
 
-        // Repaint at ~60fps for VU meters, not max framerate
+        // Poll MIDI player for events
+        let midi_events = self.midi_player.poll();
+        for event in midi_events {
+            if event.is_on {
+                let _ = self.audio_tx.push(AudioMessage::NoteOn {
+                    note: event.note,
+                    velocity: event.velocity,
+                });
+            } else {
+                let _ = self.audio_tx.push(AudioMessage::NoteOff { note: event.note });
+            }
+        }
+
+        // Repaint at ~60fps for VU meters and MIDI playback progress
         ctx.request_repaint_after(std::time::Duration::from_millis(16));
 
         // Top menu bar
@@ -530,16 +546,61 @@ impl eframe::App for MameSynthApp {
             });
         });
 
-        // Bottom panel: keyboard
+        // Bottom panel: transport + keyboard
         egui::TopBottomPanel::bottom("keyboard_panel")
-            .min_height(130.0)
+            .min_height(160.0)
             .show(ctx, |ui| {
-                ui.add_space(4.0);
-
-                // VU meters
+                // MIDI transport bar
                 ui.horizontal(|ui| {
-                    ui.add(VuMeter::new(self.peak_left, "L"));
-                    ui.add(VuMeter::new(self.peak_right, "R"));
+                    if ui.button("Open MIDI").clicked() {
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("MIDI files", &["mid", "midi"])
+                            .pick_file()
+                        {
+                            match MidiSequence::load(&path) {
+                                Ok(seq) => {
+                                    log::info!("Loaded MIDI: {} ({} events)", seq.name, seq.events.len());
+                                    self.midi_player.load(seq);
+                                }
+                                Err(e) => log::error!("Failed to load MIDI: {}", e),
+                            }
+                        }
+                    }
+
+                    if self.midi_player.has_sequence() {
+                        ui.separator();
+                        ui.label(
+                            egui::RichText::new(self.midi_player.sequence_name())
+                                .size(11.0)
+                                .color(theme::ACCENT),
+                        );
+
+                        if self.midi_player.is_playing() {
+                            if ui.button("Pause").clicked() {
+                                self.midi_player.pause();
+                            }
+                        } else if ui.button("Play").clicked() {
+                            self.midi_player.play();
+                        }
+                        if ui.button("Stop").clicked() {
+                            self.midi_player.stop();
+                        }
+
+                        // Progress bar
+                        let progress = self.midi_player.progress();
+                        let pos_sec = self.midi_player.position_us() as f32 / 1_000_000.0;
+                        let dur_sec = self.midi_player.duration_us() as f32 / 1_000_000.0;
+                        ui.add(
+                            egui::ProgressBar::new(progress)
+                                .text(format!("{:.1}s / {:.1}s", pos_sec, dur_sec))
+                                .desired_width(150.0),
+                        );
+                    }
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.add(VuMeter::new(self.peak_right, "R"));
+                        ui.add(VuMeter::new(self.peak_left, "L"));
+                    });
                 });
                 ui.add_space(4.0);
 

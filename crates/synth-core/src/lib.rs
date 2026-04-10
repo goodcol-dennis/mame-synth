@@ -2,6 +2,7 @@ pub mod audio;
 pub mod chip;
 pub mod messages;
 pub mod midi;
+pub mod midi_file;
 pub mod patch;
 pub mod sid6581;
 pub mod sn76489;

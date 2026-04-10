@@ -8,4 +8,5 @@ synth-core = { path = "../synth-core" }
 egui = "0.31"
 eframe = "0.31"
 rtrb = "0.3"
+rfd = "0.15"
 log = { workspace = true }
