@@ -11,10 +11,10 @@ const PARAM_NOISE_MODE: u32 = 2;
 
 // Duty cycle waveforms for pulse channels
 const DUTY_CYCLES: [[bool; 8]; 4] = [
-    [false, true, false, false, false, false, false, false],  // 12.5%
-    [false, true, true, false, false, false, false, false],   // 25%
-    [false, true, true, true, true, false, false, false],     // 50%
-    [true, false, false, true, true, true, true, true],       // 75% (inverted 25%)
+    [false, true, false, false, false, false, false, false], // 12.5%
+    [false, true, true, false, false, false, false, false],  // 25%
+    [false, true, true, true, true, false, false, false],    // 50%
+    [true, false, false, true, true, true, true, true],      // 75% (inverted 25%)
 ];
 
 pub fn ricoh2a03_param_info() -> Vec<ParamInfo> {
@@ -62,11 +62,11 @@ pub fn ricoh2a03_param_info() -> Vec<ParamInfo> {
 
 #[derive(Debug, Clone)]
 struct PulseChannel {
-    period: u16,     // 11-bit timer period
+    period: u16, // 11-bit timer period
     counter: u16,
-    duty: u8,        // 0-3
-    step: u8,        // position in 8-step duty sequence
-    volume: u8,      // 4-bit
+    duty: u8,   // 0-3
+    step: u8,   // position in 8-step duty sequence
+    volume: u8, // 4-bit
     enabled: bool,
 }
 
@@ -108,14 +108,14 @@ impl PulseChannel {
 struct TriangleChannel {
     period: u16,
     counter: u16,
-    step: u8,        // 0-31 triangle sequence position
+    step: u8, // 0-31 triangle sequence position
     enabled: bool,
 }
 
 // Triangle waveform lookup (32 steps)
 const TRIANGLE_SEQ: [u8; 32] = [
-    15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0,
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+    15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+    13, 14, 15,
 ];
 
 impl TriangleChannel {
@@ -202,6 +202,7 @@ pub struct Ricoh2a03 {
     pulse2: PulseChannel,
     triangle: TriangleChannel,
     noise: NoiseChannel,
+    #[allow(dead_code)]
     output_sample_rate: u32,
     phase_accumulator: f64,
     phase_increment: f64,
@@ -233,8 +234,8 @@ impl Ricoh2a03 {
     fn mix_sample(&self) -> f32 {
         // NES mixing approximation
         let pulse_out = 0.00752 * (self.pulse1.output() + self.pulse2.output()) * 15.0;
-        let tnd_out = 0.00851 * self.triangle.output() * 15.0
-            + 0.00494 * self.noise.output() * 15.0;
+        let tnd_out =
+            0.00851 * self.triangle.output() * 15.0 + 0.00494 * self.noise.output() * 15.0;
         (pulse_out + tnd_out) * 2.0 // boost
     }
 }

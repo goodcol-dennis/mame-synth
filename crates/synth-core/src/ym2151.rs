@@ -201,7 +201,7 @@ impl Ym2151 {
         let chip = unsafe { ym2151_ffi::ymfm_opm_create(YM2151_CLOCK) };
         let native_rate = unsafe { ym2151_ffi::ymfm_opm_sample_rate(YM2151_CLOCK) };
 
-        let mut ym = Ym2151 {
+        let ym = Ym2151 {
             chip,
             native_sample_rate: native_rate,
             output_sample_rate,
@@ -331,7 +331,7 @@ impl SoundChip for Ym2151 {
                 self.write_reg(0x20, 0xC0 | (self.feedback << 3) | self.algorithm);
             }
             PARAM_LFO_FREQ => {
-                self.write_reg(0x18, (value as u8));
+                self.write_reg(0x18, value as u8);
             }
             PARAM_LFO_WAVE => {
                 self.write_reg(0x1B, (value as u8).min(3));
@@ -361,10 +361,7 @@ impl SoundChip for Ym2151 {
                         OP_D1R => self.write_reg(0xA0 + reg_off, self.op_d1r[op]),
                         OP_D2R => self.write_reg(0xC0 + reg_off, self.op_d2r[op]),
                         OP_SL | OP_RR => {
-                            self.write_reg(
-                                0xE0 + reg_off,
-                                (self.op_sl[op] << 4) | self.op_rr[op],
-                            );
+                            self.write_reg(0xE0 + reg_off, (self.op_sl[op] << 4) | self.op_rr[op]);
                         }
                         OP_MUL | OP_DT1 => {
                             self.write_reg(

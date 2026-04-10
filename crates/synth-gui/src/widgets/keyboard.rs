@@ -51,8 +51,10 @@ impl PianoKeyboard {
         let black_width = key_width * 0.65;
 
         let total_width = key_width * total_white as f32;
-        let (rect, response) =
-            ui.allocate_exact_size(egui::vec2(total_width, white_height), Sense::click_and_drag());
+        let (rect, response) = ui.allocate_exact_size(
+            egui::vec2(total_width, white_height),
+            Sense::click_and_drag(),
+        );
 
         if !ui.is_rect_visible(rect) {
             return result;

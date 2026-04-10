@@ -258,7 +258,10 @@ fn e2e_all() {
 
 fn p0_app_launches(s: &HeadlessSession) {
     let state = s.dump();
-    assert_eq!(state.chip, "SN76489 (PSG)", "Default chip should be SN76489");
+    assert_eq!(
+        state.chip, "SN76489 (PSG)",
+        "Default chip should be SN76489"
+    );
     assert_eq!(state.voice_mode, "poly");
     assert!(state.num_params > 0, "Should have parameters");
     eprintln!("  p0_app_launches ... ok");
@@ -294,7 +297,10 @@ fn p0_keyboard_input(s: &HeadlessSession) {
     s.key("z");
     std::thread::sleep(Duration::from_millis(300));
     let state = s.dump();
-    assert!(!state.chip.is_empty(), "App should still be running after keypress");
+    assert!(
+        !state.chip.is_empty(),
+        "App should still be running after keypress"
+    );
     eprintln!("  p0_keyboard_input ... ok");
 }
 

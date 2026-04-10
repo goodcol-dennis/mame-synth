@@ -514,7 +514,11 @@ mod tests {
         let mut buf = vec![StereoSample::default(); 4096];
         chip.generate_samples(&mut buf);
         let peak = buf.iter().map(|s| s.left.abs()).fold(0.0f32, f32::max);
-        assert!(peak > 0.01, "Should produce output during envelope, got peak={}", peak);
+        assert!(
+            peak > 0.01,
+            "Should produce output during envelope, got peak={}",
+            peak
+        );
     }
 
     #[test]
@@ -533,7 +537,10 @@ mod tests {
             .iter()
             .zip(buf2.iter())
             .any(|(a, b)| (a.left - b.left).abs() > 0.001);
-        assert!(differs, "Different waveforms should produce different output");
+        assert!(
+            differs,
+            "Different waveforms should produce different output"
+        );
     }
 
     #[test]

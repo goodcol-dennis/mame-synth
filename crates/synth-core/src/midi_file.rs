@@ -115,6 +115,12 @@ pub struct MidiPlayer {
     playing: bool,
 }
 
+impl Default for MidiPlayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MidiPlayer {
     pub fn new() -> Self {
         MidiPlayer {
@@ -140,9 +146,8 @@ impl MidiPlayer {
         }
         if let Some(paused) = self.paused_at.take() {
             // Resume from paused position
-            self.start_time = Some(
-                std::time::Instant::now() - std::time::Duration::from_micros(paused),
-            );
+            self.start_time =
+                Some(std::time::Instant::now() - std::time::Duration::from_micros(paused));
         } else {
             self.start_time = Some(std::time::Instant::now());
             self.cursor = 0;
@@ -287,7 +292,10 @@ mod tests {
         // Position should be >= 0 (may be 0 on very fast machines)
         // The key assertion is that pause captures a position
         let paused_pos = player.position_us();
-        assert!(paused_pos < 500_000, "Should not have advanced past the sequence");
+        assert!(
+            paused_pos < 500_000,
+            "Should not have advanced past the sequence"
+        );
 
         player.stop();
         assert!(!player.is_playing());

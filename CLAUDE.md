@@ -44,19 +44,28 @@ Audio thread (cpal callback)
 
 ## Adding a New Chip
 
-1. Create `crates/synth-core/src/<chip>.rs` implementing `SoundChip`
-2. Add variant to `ChipId` enum in `chip.rs`
-3. Add to `param_info_for_chip()` in `chip.rs`
-4. Add to `create_bank()` in `audio.rs`
-5. Create panel in `crates/synth-gui/src/panels/<chip>_panel.rs`
-6. Add match arm in `app.rs` chip header section
+See [CODEBASE.md](CODEBASE.md) for the full 7-step walkthrough. Summary:
+1. Create chip `.rs` implementing `SoundChip` trait
+2. Register in `chip.rs`, `audio.rs`, `patch.rs`, `lib.rs`
+3. Tests auto-cover via `ChipId::all()` iteration in harness
 
 ## Known Issues
 
 - **Audio latency ~100ms**: `BufferSize::Default` gives ~4410 frames on this system. `Fixed(256)` silently kills the audio callback. Root cause: cpal ALSA backend + PipeWire compatibility. Workaround: none yet — needs investigation into PipeWire native backend or JACK.
 - **Wayland key repeat**: egui marks the initial keypress as `repeat: true` in some cases. Workaround: use raw `Event::Key` events, deduplicate per-key per-frame, take last state.
-- **Virtual keyboard mouse input**: Click/drag on the piano keyboard widget is unreliable. Needs rewrite of hit detection and drag state tracking.
 - **Debug builds unusable**: Chip emulation is too slow in debug mode — audio underruns. Always use `--release`.
+
+## Acknowledged Gaps
+
+| Gap | Severity | Status | Notes |
+|-----|----------|--------|-------|
+| Audio latency ~100ms | Medium | Open | cpal `Default` buffer is large. `Fixed(256)` crashes callback. Need PipeWire native or JACK investigation. |
+| YM2612 idle output (~0.06 peak) | Low | Open | `init_default_patch()` leaves operators producing background noise. Need key-off on all channels at init. |
+| E2E tests not passing in cage | Medium | Open | F11/F12 key injection timing issues with egui inside headless cage compositor. Tests scaffolded but need tuning. |
+| No CI pipeline | Low | Deferred | Pre-commit hook enforces locally. CI can wait until contributors join. |
+| rtrb SPSC limits MIDI input | Medium | Open | Can't connect hardware MIDI and GUI to same ring buffer. Need second channel or MPSC queue. |
+| No multi-chip stacking in GUI | Low | Planned | ChipBank supports it. GUI needs chip count spinner control. |
+| app.rs still 516 lines | Low | Acceptable | Down from 774. Remaining code is egui layout, hard to split further without readability loss. |
 
 ## YMFM FFI
 

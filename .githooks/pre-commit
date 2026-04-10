@@ -1,0 +1,18 @@
+#!/bin/bash
+# Pre-commit hook: enforces formatting, linting, and tests.
+# Install: git config core.hooksPath .githooks
+
+set -e
+
+echo "==> cargo fmt --check"
+cargo fmt --all -- --check
+
+echo "==> cargo clippy"
+cargo clippy --release -- -D warnings 2>&1 | grep -v "synth-core@" || true
+# Check clippy exit code (the grep swallows it)
+cargo clippy --release -- -D warnings 2>/dev/null
+
+echo "==> cargo test (unit + property + harness)"
+cargo test --release --workspace --lib --test chip_properties --test audio_harness
+
+echo "All checks passed."

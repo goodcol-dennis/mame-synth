@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use crate::chip::{param_info_for_chip, ChipId, ParamKind, VoiceMode};
+use crate::chip::{ChipId, VoiceMode};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Patch {
@@ -192,7 +192,7 @@ fn factory_presets() -> Vec<Patch> {
             voice_mode: "mono".into(),
             unison_detune: 0.0,
             params: HashMap::from([
-                ("0".into(), 0.0), // tone 1 vol: loud
+                ("0".into(), 0.0),  // tone 1 vol: loud
                 ("1".into(), 15.0), // tone 2 vol: silent
                 ("2".into(), 15.0), // tone 3 vol: silent
                 ("3".into(), 15.0), // noise vol: silent
@@ -217,13 +217,13 @@ fn factory_presets() -> Vec<Patch> {
             voice_mode: "mono".into(),
             unison_detune: 0.0,
             params: HashMap::from([
-                ("0".into(), 1.0),  // sawtooth
+                ("0".into(), 1.0),    // sawtooth
                 ("1".into(), 2048.0), // pulse width
-                ("2".into(), 0.0),  // fast attack
-                ("3".into(), 6.0),  // medium decay
-                ("4".into(), 8.0),  // mid sustain
-                ("5".into(), 4.0),  // medium release
-                ("6".into(), 15.0), // full volume
+                ("2".into(), 0.0),    // fast attack
+                ("3".into(), 6.0),    // medium decay
+                ("4".into(), 8.0),    // mid sustain
+                ("5".into(), 4.0),    // medium release
+                ("6".into(), 15.0),   // full volume
             ]),
         },
         Patch {
@@ -232,7 +232,7 @@ fn factory_presets() -> Vec<Patch> {
             voice_mode: "unison".into(),
             unison_detune: 12.0,
             params: HashMap::from([
-                ("0".into(), 1.0),  // sawtooth
+                ("0".into(), 1.0), // sawtooth
                 ("1".into(), 2048.0),
                 ("2".into(), 2.0),
                 ("3".into(), 4.0),
@@ -247,7 +247,7 @@ fn factory_presets() -> Vec<Patch> {
             voice_mode: "mono".into(),
             unison_detune: 0.0,
             params: HashMap::from([
-                ("0".into(), 2.0),  // pulse
+                ("0".into(), 2.0),    // pulse
                 ("1".into(), 1200.0), // narrow pulse
                 ("2".into(), 0.0),
                 ("3".into(), 3.0),
@@ -263,8 +263,8 @@ fn factory_presets() -> Vec<Patch> {
             voice_mode: "poly".into(),
             unison_detune: 0.0,
             params: HashMap::from([
-                ("0".into(), 4.0),   // algorithm 4
-                ("1".into(), 3.0),   // feedback 3
+                ("0".into(), 4.0),    // algorithm 4
+                ("1".into(), 3.0),    // feedback 3
                 ("100".into(), 40.0), // op1 TL
                 ("101".into(), 31.0), // op1 AR
                 ("102".into(), 8.0),  // op1 D1R
@@ -285,15 +285,15 @@ fn factory_presets() -> Vec<Patch> {
             voice_mode: "poly".into(),
             unison_detune: 0.0,
             params: HashMap::from([
-                ("0".into(), 0.0),   // algorithm 0 (serial)
-                ("1".into(), 5.0),   // feedback 5
+                ("0".into(), 0.0),    // algorithm 0 (serial)
+                ("1".into(), 5.0),    // feedback 5
                 ("100".into(), 30.0), // op1 TL
                 ("101".into(), 31.0),
                 ("106".into(), 1.0),  // op1 MUL
                 ("200".into(), 35.0), // op2 TL
                 ("201".into(), 28.0),
                 ("206".into(), 3.0),
-                ("300".into(), 0.0),  // op4 TL
+                ("300".into(), 0.0), // op4 TL
                 ("301".into(), 31.0),
                 ("302".into(), 4.0),
                 ("304".into(), 3.0),

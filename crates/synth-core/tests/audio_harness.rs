@@ -139,7 +139,10 @@ fn sn76489_full_pipeline() {
     assert!(s.has_audio(1024), "Should produce audio after note_on");
 
     s.note_off(60);
-    assert!(!s.has_audio(256), "SN76489 has no release — should go silent");
+    assert!(
+        !s.has_audio(256),
+        "SN76489 has no release — should go silent"
+    );
 }
 
 #[test]
@@ -285,7 +288,8 @@ fn no_nan_through_pipeline_all_chips() {
         }
         let buf = s.generate(4096);
         assert!(
-            buf.iter().all(|s| s.left.is_finite() && s.right.is_finite()),
+            buf.iter()
+                .all(|s| s.left.is_finite() && s.right.is_finite()),
             "NaN/Inf detected for {:?}",
             chip_id
         );
@@ -321,7 +325,8 @@ fn param_changes_during_playback_stable() {
             });
             let buf = s.generate(256);
             assert!(
-                buf.iter().all(|s| s.left.is_finite() && s.right.is_finite()),
+                buf.iter()
+                    .all(|s| s.left.is_finite() && s.right.is_finite()),
                 "NaN after setting param {} on {:?}",
                 param.name,
                 chip_id

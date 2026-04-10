@@ -57,10 +57,10 @@ pub fn ay8910_param_info() -> Vec<ParamInfo> {
 
 #[derive(Debug, Clone)]
 struct ToneChannel {
-    period: u16,   // 12-bit tone period
+    period: u16, // 12-bit tone period
     counter: u16,
     output: bool,
-    volume: u8,    // 4-bit (0-15), or 16 = use envelope
+    volume: u8, // 4-bit (0-15), or 16 = use envelope
 }
 
 impl ToneChannel {
@@ -108,6 +108,7 @@ pub struct Ay8910 {
     env_counter: u32,
     env_step: u8,
     volume_table: [f32; 16],
+    #[allow(dead_code)]
     output_sample_rate: u32,
     phase_accumulator: f64,
     phase_increment: f64,
@@ -200,7 +201,7 @@ impl SoundChip for Ay8910 {
                 self.noise_enable = [on, on, on];
             }
             PARAM_ENV_SHAPE => self.env_shape = (value as u8).min(15),
-            PARAM_ENV_PERIOD => self.env_period = (value as u16),
+            PARAM_ENV_PERIOD => self.env_period = value as u16,
             _ => {}
         }
     }

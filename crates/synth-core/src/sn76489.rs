@@ -373,7 +373,7 @@ mod tests {
         let mut chip2 = make_chip();
         chip1.voice_on(0, 60, 127, 0.0);
         chip2.voice_on(0, 60, 127, 50.0); // 50 cents sharp
-        // They should produce different sample patterns
+                                          // They should produce different sample patterns
         let mut buf1 = vec![StereoSample::default(); 512];
         let mut buf2 = vec![StereoSample::default(); 512];
         chip1.generate_samples(&mut buf1);

@@ -29,14 +29,14 @@ pub fn pokey_param_info() -> Vec<ParamInfo> {
 
 #[derive(Debug, Clone)]
 struct Channel {
-    divider: u8,  // 8-bit frequency divider (AUDF)
+    divider: u8, // 8-bit frequency divider (AUDF)
     counter: u16,
-    volume: u8,   // 4-bit volume (AUDV)
+    volume: u8, // 4-bit volume (AUDV)
     output: bool,
     // Polynomial counters for noise
-    poly4: u8,    // 4-bit LFSR
-    poly5: u8,    // 5-bit LFSR
-    poly17: u32,  // 17-bit LFSR
+    poly4: u8,      // 4-bit LFSR
+    poly5: u8,      // 5-bit LFSR
+    poly17: u32,    // 17-bit LFSR
     distortion: u8, // AUDC distortion mode (0-3 simplified)
 }
 
@@ -68,13 +68,13 @@ impl Channel {
                 1 => {
                     // 4-bit poly (buzzy)
                     let feedback = ((self.poly4 >> 3) ^ (self.poly4 >> 2)) & 1;
-                    self.poly4 = ((self.poly4 << 1) | feedback as u8) & 0x0F;
+                    self.poly4 = ((self.poly4 << 1) | feedback) & 0x0F;
                     self.output = (self.poly4 & 1) != 0;
                 }
                 2 => {
                     // 5-bit poly (gritty)
                     let feedback = ((self.poly5 >> 4) ^ (self.poly5 >> 2)) & 1;
-                    self.poly5 = ((self.poly5 << 1) | feedback as u8) & 0x1F;
+                    self.poly5 = ((self.poly5 << 1) | feedback) & 0x1F;
                     self.output = (self.poly5 & 1) != 0;
                 }
                 _ => {
@@ -96,6 +96,7 @@ impl Channel {
     }
 }
 
+#[allow(dead_code)]
 pub struct Pokey {
     channels: [Channel; 4],
     distortion: u8,
