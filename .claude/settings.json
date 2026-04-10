@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "/run/user/1000"
+    ],
+    "allow": [
+      "Bash(grep -v \"^\\\\s*$\")"
+    ]
+  }
+}

@@ -1,11 +1,12 @@
 //! Headless Wayland E2E tests for mame-synth.
 //!
-//! Launches mame-synth inside a headless `cage` compositor, injects input
-//! via `wtype` (keyboard) and `wlrctl` (mouse). Verifies app state via
-//! F11 (test-command) and F12 (dump-state) protocol.
+//! Launches mame-synth inside a headless `cage` compositor.  Commands are
+//! delivered by writing to /tmp/mame-synth-input.txt, which the app polls
+//! on every frame — no key injection required.
 //!
 //! ## Requirements
-//!   sudo apt install cage wtype wlrctl
+//!   sudo apt install cage
+//!   (wtype / wlrctl are only needed for the optional keyboard / mouse helpers)
 //!
 //! ## Run
 //!   cargo test --release --test e2e_wayland -- --nocapture --test-threads=1
@@ -15,7 +16,12 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
 const WARMUP: Duration = Duration::from_millis(1500);
-const CMD_DELAY: Duration = Duration::from_millis(400);
+/// How long to wait for the app to process a command written to the input file.
+/// The app renders at ~60 fps (16 ms/frame), so two frames is plenty, but we
+/// add extra headroom for CI scheduling jitter.
+const CMD_DELAY: Duration = Duration::from_millis(200);
+/// How long to wait after a state-dump request before reading the output file.
+const DUMP_TIMEOUT: Duration = Duration::from_secs(3);
 const SHORT: Duration = Duration::from_millis(200);
 
 // ── HeadlessSession ──
@@ -33,8 +39,9 @@ impl HeadlessSession {
         let bin = env!("CARGO_BIN_EXE_mame-synth");
         let cage_child = Command::new("cage")
             .args(["-d", "--", bin])
+            .env("WLR_BACKENDS", "headless")
             .env("WLR_LIBINPUT_NO_DEVICES", "1")
-            .env("WAYLAND_DISPLAY", "")
+            .env("WAYLAND_DISPLAY", "") // don't nest on parent
             .env("RUST_LOG", "info,zbus=warn,sctk=warn,tracing=warn")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -53,6 +60,7 @@ impl HeadlessSession {
         }
         assert!(!socket.is_empty(), "cage did not create a Wayland socket");
 
+        // Give cage + egui time to paint the first frame.
         std::thread::sleep(Duration::from_secs(3));
 
         let session = Self {
@@ -60,7 +68,8 @@ impl HeadlessSession {
             wayland_display: socket,
         };
 
-        session.wtype_raw(&["-k", "Escape"]);
+        // Clean up any leftover input file from a previous run.
+        let _ = std::fs::remove_file("/tmp/mame-synth-input.txt");
         std::thread::sleep(WARMUP);
 
         session
@@ -89,9 +98,20 @@ impl HeadlessSession {
     }
 
     fn send_command(&self, cmd: &str) {
+        // Write the command; the app polls this file on every frame and
+        // deletes it once consumed — no key injection needed.
         std::fs::write("/tmp/mame-synth-input.txt", cmd).unwrap();
-        self.wtype_raw(&["-k", "F11"]);
-        std::thread::sleep(CMD_DELAY);
+
+        // Wait until the file is gone (consumed) so the next command never
+        // overwrites an unread one.  Fall back to CMD_DELAY if the app is
+        // slow or the file lingers for any other reason.
+        let deadline = std::time::Instant::now() + CMD_DELAY;
+        while std::time::Instant::now() < deadline {
+            if !std::path::Path::new("/tmp/mame-synth-input.txt").exists() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
     }
 
     fn switch_chip(&self, name: &str) {
@@ -114,14 +134,28 @@ impl HeadlessSession {
         self.send_command(&format!("set-voice-mode {mode}"));
     }
 
+    #[allow(dead_code)]
     fn reset(&self) {
         self.send_command("reset");
     }
 
     fn dump(&self) -> State {
+        // Remove stale state file, then ask the app to write a fresh one.
         let _ = std::fs::remove_file("/tmp/mame-synth-state.txt");
-        self.wtype_raw(&["-k", "F12"]);
-        std::thread::sleep(CMD_DELAY);
+        std::fs::write("/tmp/mame-synth-input.txt", "dump-state").unwrap();
+
+        // Poll until the state file appears (or we time out).
+        let deadline = std::time::Instant::now() + DUMP_TIMEOUT;
+        loop {
+            if std::path::Path::new("/tmp/mame-synth-state.txt").exists() {
+                break;
+            }
+            if std::time::Instant::now() >= deadline {
+                eprintln!("WARN: timed out waiting for state dump");
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
         State::load()
     }
 

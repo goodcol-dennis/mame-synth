@@ -92,42 +92,23 @@ impl MameSynthApp {
         }
     }
 
-    /// F11: Read test command from /tmp/mame-synth-input.txt and execute it.
-    /// F12: Dump current state to /tmp/mame-synth-state.txt.
-    pub(crate) fn handle_test_commands(&mut self, ctx: &egui::Context) {
-        let f11 = ctx.input(|i| {
-            i.events.iter().any(|e| {
-                matches!(
-                    e,
-                    egui::Event::Key {
-                        key: egui::Key::F11,
-                        pressed: true,
-                        ..
-                    }
-                )
-            })
-        });
-        let f12 = ctx.input(|i| {
-            i.events.iter().any(|e| {
-                matches!(
-                    e,
-                    egui::Event::Key {
-                        key: egui::Key::F12,
-                        pressed: true,
-                        ..
-                    }
-                )
-            })
-        });
-
-        if f11 {
-            if let Ok(cmd) = std::fs::read_to_string("/tmp/mame-synth-input.txt") {
-                self.execute_test_command(cmd.trim());
+    /// Poll /tmp/mame-synth-input.txt every frame for test commands.
+    ///
+    /// Writing a command to that file is sufficient — no key injection needed.
+    /// Supported commands are the same as before plus `dump-state` (which
+    /// writes /tmp/mame-synth-state.txt).  The file is deleted after it is
+    /// consumed so each command fires exactly once.
+    pub(crate) fn handle_test_commands(&mut self, _ctx: &egui::Context) {
+        let input_path = "/tmp/mame-synth-input.txt";
+        if let Ok(cmd) = std::fs::read_to_string(input_path) {
+            // Remove the file first so a slow frame cannot re-trigger it.
+            let _ = std::fs::remove_file(input_path);
+            let cmd = cmd.trim().to_string();
+            if cmd == "dump-state" {
+                self.dump_state();
+            } else if !cmd.is_empty() {
+                self.execute_test_command(&cmd);
             }
-        }
-
-        if f12 {
-            self.dump_state();
         }
     }
 
