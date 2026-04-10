@@ -1,0 +1,20 @@
+[workspace]
+members = ["crates/synth-core", "crates/synth-gui"]
+resolver = "2"
+
+[workspace.dependencies]
+log = "0.4"
+env_logger = "0.11"
+
+[package]
+name = "mame-synth"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+synth-core = { path = "crates/synth-core" }
+synth-gui = { path = "crates/synth-gui" }
+eframe = { version = "0.31", default-features = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+rtrb = "0.3"
