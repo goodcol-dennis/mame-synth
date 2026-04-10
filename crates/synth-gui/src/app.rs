@@ -90,11 +90,9 @@ impl MameSynthApp {
         }
     }
 
-    /// Send note-off for all 128 MIDI notes to silence everything.
+    /// Silence everything — reset the active chip.
     pub(crate) fn all_notes_off(&mut self) {
-        for note in 0..128u8 {
-            let _ = self.audio_tx.push(AudioMessage::NoteOff { note });
-        }
+        let _ = self.audio_tx.push(AudioMessage::Reset);
         self.held_keys.clear();
     }
 

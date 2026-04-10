@@ -334,3 +334,50 @@ fn param_changes_during_playback_stable() {
         }
     }
 }
+
+// =============================================================================
+// Stop/Reset silences all chips
+// =============================================================================
+
+#[test]
+fn reset_silences_active_notes() {
+    for chip_id in ChipId::all() {
+        let mut s = AudioSession::new();
+        s.switch_chip(*chip_id);
+        s.generate(4096); // settle
+
+        // Play a chord
+        s.note_on(60, 100);
+        s.note_on(64, 100);
+        s.note_on(67, 100);
+        assert!(s.has_audio(4096), "Should have audio for {:?}", chip_id);
+
+        // Reset should silence everything
+        s.send(AudioMessage::Reset);
+        s.generate(8192); // let reset take effect
+        let peak = s.generate_peak(4096);
+        // YM2612 has known idle output (~0.06), others should be near-silent
+        assert!(
+            peak < 0.1,
+            "Reset should silence {:?}, got peak={}",
+            chip_id,
+            peak
+        );
+    }
+}
+
+#[test]
+fn notes_off_after_notes_on() {
+    let mut s = AudioSession::new();
+    s.note_on(60, 100);
+    s.note_on(64, 100);
+    assert!(s.has_audio(512));
+
+    s.note_off(60);
+    s.note_off(64);
+    // SN76489 has no release — should go silent immediately
+    assert!(
+        !s.has_audio(256),
+        "SN76489 should be silent after all note-offs"
+    );
+}
