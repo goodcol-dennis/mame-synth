@@ -8,6 +8,10 @@ pub enum ChipId {
     Ricoh2a03,
     Pokey,
     Ym2151,
+    Ym3812,
+    Ymf262,
+    Scc,
+    NamcoWsg,
 }
 
 impl ChipId {
@@ -20,6 +24,10 @@ impl ChipId {
             ChipId::Ricoh2a03,
             ChipId::Pokey,
             ChipId::Ym2151,
+            ChipId::Ym3812,
+            ChipId::Ymf262,
+            ChipId::Scc,
+            ChipId::NamcoWsg,
         ]
     }
 
@@ -32,6 +40,10 @@ impl ChipId {
             ChipId::Ricoh2a03 => "2A03 (NES)",
             ChipId::Pokey => "POKEY (Atari)",
             ChipId::Ym2151 => "YM2151 (OPM)",
+            ChipId::Ym3812 => "YM3812 (OPL2)",
+            ChipId::Ymf262 => "YMF262 (OPL3)",
+            ChipId::Scc => "SCC (Konami)",
+            ChipId::NamcoWsg => "Namco WSG",
         }
     }
 }
@@ -138,5 +150,9 @@ pub fn param_info_for_chip(id: ChipId) -> Vec<ParamInfo> {
         ChipId::Ricoh2a03 => crate::ricoh2a03::ricoh2a03_param_info(),
         ChipId::Pokey => crate::pokey::pokey_param_info(),
         ChipId::Ym2151 => crate::ym2151::ym2151_param_info(),
+        ChipId::Ym3812 => crate::ym3812::ym3812_param_info(),
+        ChipId::Ymf262 => crate::ymf262::ymf262_param_info(),
+        ChipId::Scc => crate::scc::scc_param_info(),
+        ChipId::NamcoWsg => crate::namco_wsg::namco_wsg_param_info(),
     }
 }

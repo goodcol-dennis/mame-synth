@@ -5,6 +5,11 @@ use synth_gui::app::MameSynthApp;
 fn main() -> eframe::Result<()> {
     env_logger::init();
 
+    // Request low-latency audio from PipeWire (256 samples ≈ 5.3ms at 48kHz)
+    // This only affects our process — doesn't change system-wide settings.
+    // PipeWire respects this when using the ALSA compatibility layer.
+    std::env::set_var("PIPEWIRE_QUANTUM", "256/48000");
+
     // Create rtrb ring buffers for thread communication
     let (audio_tx, audio_rx) = rtrb::RingBuffer::<AudioMessage>::new(1024);
     let (gui_tx, gui_rx) = rtrb::RingBuffer::<GuiMessage>::new(256);

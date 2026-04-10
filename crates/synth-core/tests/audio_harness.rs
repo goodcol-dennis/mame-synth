@@ -7,13 +7,17 @@
 use synth_core::ay8910::Ay8910;
 use synth_core::chip::{ChipId, StereoSample, VoiceMode};
 use synth_core::messages::AudioMessage;
+use synth_core::namco_wsg::NamcoWsg;
 use synth_core::pokey::Pokey;
 use synth_core::ricoh2a03::Ricoh2a03;
+use synth_core::scc::Scc;
 use synth_core::sid6581::Sid6581;
 use synth_core::sn76489::Sn76489;
 use synth_core::voice::ChipBank;
 use synth_core::ym2151::Ym2151;
 use synth_core::ym2612::Ym2612;
+use synth_core::ym3812::Ym3812;
+use synth_core::ymf262::Ymf262;
 
 const SAMPLE_RATE: u32 = 44100;
 
@@ -51,6 +55,10 @@ impl AudioSession {
                     ChipId::Ricoh2a03 => Box::new(Ricoh2a03::new(SAMPLE_RATE)),
                     ChipId::Pokey => Box::new(Pokey::new(SAMPLE_RATE)),
                     ChipId::Ym2151 => Box::new(Ym2151::new(SAMPLE_RATE)),
+                    ChipId::Ym3812 => Box::new(Ym3812::new(SAMPLE_RATE)),
+                    ChipId::Ymf262 => Box::new(Ymf262::new(SAMPLE_RATE)),
+                    ChipId::Scc => Box::new(Scc::new(SAMPLE_RATE)),
+                    ChipId::NamcoWsg => Box::new(NamcoWsg::new(SAMPLE_RATE)),
                 }
             })
             .collect();

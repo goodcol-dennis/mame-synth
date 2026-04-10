@@ -4,13 +4,17 @@ use rtrb::{Consumer, Producer};
 use crate::ay8910::Ay8910;
 use crate::chip::{ChipId, StereoSample};
 use crate::messages::{AudioMessage, GuiMessage};
+use crate::namco_wsg::NamcoWsg;
 use crate::pokey::Pokey;
 use crate::ricoh2a03::Ricoh2a03;
+use crate::scc::Scc;
 use crate::sid6581::Sid6581;
 use crate::sn76489::Sn76489;
 use crate::voice::ChipBank;
 use crate::ym2151::Ym2151;
 use crate::ym2612::Ym2612;
+use crate::ym3812::Ym3812;
+use crate::ymf262::Ymf262;
 
 struct AudioState {
     banks: Vec<ChipBank>,
@@ -39,6 +43,10 @@ fn create_bank(chip_id: ChipId, count: usize, sample_rate: u32) -> ChipBank {
                 ChipId::Ricoh2a03 => Box::new(Ricoh2a03::new(sample_rate)),
                 ChipId::Pokey => Box::new(Pokey::new(sample_rate)),
                 ChipId::Ym2151 => Box::new(Ym2151::new(sample_rate)),
+                ChipId::Ym3812 => Box::new(Ym3812::new(sample_rate)),
+                ChipId::Ymf262 => Box::new(Ymf262::new(sample_rate)),
+                ChipId::Scc => Box::new(Scc::new(sample_rate)),
+                ChipId::NamcoWsg => Box::new(NamcoWsg::new(sample_rate)),
             }
         })
         .collect();
