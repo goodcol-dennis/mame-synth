@@ -8,6 +8,7 @@ pub mod patch;
 pub mod pokey;
 pub mod ricoh2a03;
 pub mod sid6581;
+pub mod sid_extract;
 pub mod sn76489;
 pub mod vgm;
 pub mod vgm_extract;

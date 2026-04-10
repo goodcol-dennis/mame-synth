@@ -15,7 +15,7 @@ impl<'a> VuMeter<'a> {
 
 impl<'a> Widget for VuMeter<'a> {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        let desired_size = egui::vec2(ui.available_width().min(200.0), 20.0);
+        let desired_size = egui::vec2(100.0, 16.0);
         let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::hover());
 
         if ui.is_rect_visible(rect) {

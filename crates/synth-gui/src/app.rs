@@ -5,6 +5,7 @@ use synth_core::messages::{AudioMessage, GuiMessage};
 use synth_core::midi::MidiHandler;
 use synth_core::midi_file::{MidiPlayer, MidiSequence};
 use synth_core::patch::{Patch, PatchBank};
+use synth_core::sid_extract;
 use synth_core::vgm::VgmFile;
 use synth_core::vgm_extract;
 
@@ -87,6 +88,14 @@ impl MameSynthApp {
             show_save_dialog: false,
             midi_player: MidiPlayer::new(),
         }
+    }
+
+    /// Send note-off for all 128 MIDI notes to silence everything.
+    pub(crate) fn all_notes_off(&mut self) {
+        for note in 0..128u8 {
+            let _ = self.audio_tx.push(AudioMessage::NoteOff { note });
+        }
+        self.held_keys.clear();
     }
 
     pub(crate) fn switch_chip(&mut self, new_chip: ChipId) {
@@ -188,6 +197,7 @@ impl eframe::App for MameSynthApp {
         self.peak_right *= decay;
 
         // Poll MIDI player for events
+        let was_playing = self.midi_player.is_playing();
         let midi_events = self.midi_player.poll();
         for event in midi_events {
             if event.is_on {
@@ -200,6 +210,10 @@ impl eframe::App for MameSynthApp {
                     .audio_tx
                     .push(AudioMessage::NoteOff { note: event.note });
             }
+        }
+        // When playback ends, release all notes
+        if was_playing && !self.midi_player.is_playing() {
+            self.all_notes_off();
         }
 
         // Repaint at ~60fps for VU meters and MIDI playback progress
@@ -312,51 +326,73 @@ impl eframe::App for MameSynthApp {
             .show(ctx, |ui| {
                 // MIDI transport bar
                 ui.horizontal(|ui| {
-                    if ui.button("Import VGM").clicked() {
+                    if ui.button("Import VGM/SID").clicked() {
                         if let Some(path) = rfd::FileDialog::new()
-                            .add_filter("VGM files", &["vgm", "vgz"])
+                            .add_filter("Sound files", &["vgm", "vgz", "sid"])
                             .pick_file()
                         {
-                            match VgmFile::load(&path) {
-                                Ok(vgm_file) => {
-                                    log::info!("Loaded VGM: {}", vgm_file.summary());
-                                    let extractions = vgm_extract::extract(&vgm_file);
-                                    let mut total_patches = 0;
-                                    let mut total_events = 0;
+                            let is_sid = path.extension().map(|e| e == "sid").unwrap_or(false);
 
-                                    for ext in &extractions {
-                                        // Save extracted patches
-                                        for patch in &ext.patches {
-                                            if let Err(e) = self.patch_bank.save_patch(patch) {
-                                                log::error!("Failed to save patch: {}", e);
-                                            }
-                                            total_patches += 1;
-                                        }
-
-                                        // Load first extraction as MIDI sequence
-                                        if !ext.events.is_empty() {
-                                            let seq = MidiSequence {
-                                                events: ext.events.clone(),
-                                                duration_us: ext.duration_us,
-                                                name: format!(
-                                                    "{} ({})",
-                                                    path.file_stem()
-                                                        .map(|s| s.to_string_lossy().to_string())
-                                                        .unwrap_or_default(),
-                                                    ext.chip_name
-                                                ),
-                                            };
-                                            total_events += seq.events.len();
-                                            self.midi_player.load(seq);
-                                        }
+                            let extractions: Vec<vgm_extract::VgmExtraction> = if is_sid {
+                                match sid_extract::extract_sid_file(&path) {
+                                    Ok((ext, info)) => {
+                                        log::info!(
+                                            "SID: '{}' by {} → {} events",
+                                            info.name,
+                                            info.author,
+                                            ext.events.len()
+                                        );
+                                        vec![ext]
                                     }
-                                    log::info!(
-                                        "VGM import: {} patches, {} note events",
-                                        total_patches,
-                                        total_events
-                                    );
+                                    Err(e) => {
+                                        log::error!("Failed to load SID: {}", e);
+                                        vec![]
+                                    }
                                 }
-                                Err(e) => log::error!("Failed to load VGM: {}", e),
+                            } else {
+                                match VgmFile::load(&path) {
+                                    Ok(vgm_file) => {
+                                        log::info!("Loaded VGM: {}", vgm_file.summary());
+                                        vgm_extract::extract(&vgm_file)
+                                    }
+                                    Err(e) => {
+                                        log::error!("Failed to load VGM: {}", e);
+                                        vec![]
+                                    }
+                                }
+                            };
+
+                            let mut total_patches = 0;
+                            let mut total_events = 0;
+                            for ext in &extractions {
+                                for patch in &ext.patches {
+                                    if let Err(e) = self.patch_bank.save_patch(patch) {
+                                        log::error!("Failed to save patch: {}", e);
+                                    }
+                                    total_patches += 1;
+                                }
+                                if !ext.events.is_empty() {
+                                    let seq = MidiSequence {
+                                        events: ext.events.clone(),
+                                        duration_us: ext.duration_us,
+                                        name: format!(
+                                            "{} ({})",
+                                            path.file_stem()
+                                                .map(|s| s.to_string_lossy().to_string())
+                                                .unwrap_or_default(),
+                                            ext.chip_name
+                                        ),
+                                    };
+                                    total_events += seq.events.len();
+                                    self.midi_player.load(seq);
+                                }
+                            }
+                            if total_patches > 0 || total_events > 0 {
+                                log::info!(
+                                    "Import: {} patches, {} note events",
+                                    total_patches,
+                                    total_events
+                                );
                             }
                         }
                     }
@@ -397,6 +433,7 @@ impl eframe::App for MameSynthApp {
                         }
                         if ui.button("Stop").clicked() {
                             self.midi_player.stop();
+                            self.all_notes_off();
                         }
 
                         // Progress bar

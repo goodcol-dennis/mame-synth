@@ -23,5 +23,9 @@ rtrb = "0.3"
 name = "mame-synth-extract"
 path = "src/extract.rs"
 
+[[bin]]
+name = "generate-demos"
+path = "src/generate_demos.rs"
+
 [dev-dependencies]
 libc = "0.2"
