@@ -425,6 +425,7 @@ impl eframe::App for MameSynthApp {
                         if self.midi_player.is_playing() {
                             if ui.button("Pause").clicked() {
                                 self.midi_player.pause();
+                                self.all_notes_off();
                             }
                         } else if ui.button("Play").clicked() {
                             self.midi_player.play();
