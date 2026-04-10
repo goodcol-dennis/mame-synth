@@ -30,6 +30,7 @@ pub struct MameSynthApp {
     theme_applied: bool,
     voice_mode_index: usize, // 0=Poly, 1=Mono, 2=Unison
     unison_detune: f32,
+    mouse_note: Option<u8>, // currently held note from mouse click on keyboard
 }
 
 impl MameSynthApp {
@@ -55,6 +56,7 @@ impl MameSynthApp {
             theme_applied: false,
             voice_mode_index: 0,
             unison_detune: 15.0,
+            mouse_note: None,
         }
     }
 
@@ -472,7 +474,7 @@ impl eframe::App for MameSynthApp {
 
                 // Virtual keyboard
                 let keyboard = PianoKeyboard::new(self.keyboard_octave, 4);
-                let result = keyboard.show(ui, &self.held_keys);
+                let result = keyboard.show(ui, &self.held_keys, &mut self.mouse_note);
 
                 if let Some(note) = result.note_on {
                     if !self.held_keys.contains(&note) {

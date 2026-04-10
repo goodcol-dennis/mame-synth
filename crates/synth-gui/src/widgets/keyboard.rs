@@ -4,7 +4,6 @@ use crate::theme;
 
 const WHITE_KEYS_PER_OCTAVE: usize = 7;
 
-// Which notes in an octave are black keys
 const IS_BLACK: [bool; 12] = [
     false, true, false, true, false, false, true, false, true, false, true, false,
 ];
@@ -19,6 +18,12 @@ pub struct KeyboardResult {
     pub note_off: Option<u8>,
 }
 
+struct KeyRect {
+    rect: egui::Rect,
+    midi_note: u8,
+    is_black: bool,
+}
+
 impl PianoKeyboard {
     pub fn new(base_octave: u8, num_octaves: u8) -> Self {
         PianoKeyboard {
@@ -27,7 +32,12 @@ impl PianoKeyboard {
         }
     }
 
-    pub fn show(&self, ui: &mut egui::Ui, held_keys: &[u8]) -> KeyboardResult {
+    pub fn show(
+        &self,
+        ui: &mut egui::Ui,
+        held_keys: &[u8],
+        mouse_note: &mut Option<u8>,
+    ) -> KeyboardResult {
         let mut result = KeyboardResult {
             note_on: None,
             note_off: None,
@@ -41,96 +51,43 @@ impl PianoKeyboard {
         let black_width = key_width * 0.65;
 
         let total_width = key_width * total_white as f32;
-        let (rect, response) = ui.allocate_exact_size(
-            egui::vec2(total_width, white_height),
-            Sense::click_and_drag(),
-        );
+        let (rect, response) =
+            ui.allocate_exact_size(egui::vec2(total_width, white_height), Sense::click_and_drag());
 
         if !ui.is_rect_visible(rect) {
             return result;
         }
 
         let painter = ui.painter_at(rect);
+        let keys = self.build_key_rects(rect, key_width, white_height, black_height, black_width);
 
-        // Build key rectangles for hit testing
-        struct KeyRect {
-            rect: egui::Rect,
-            midi_note: u8,
-            is_black: bool,
-        }
-        let mut keys = Vec::new();
+        // Hit test: find which key the pointer is over
+        let hit_note = response
+            .interact_pointer_pos()
+            .and_then(|pos| self.hit_test(&keys, pos));
 
-        // White keys first
-        let mut white_idx = 0;
-        for octave in 0..self.num_octaves {
-            for (semitone, &is_black) in IS_BLACK.iter().enumerate() {
-                if is_black {
-                    continue;
-                }
-                let x = rect.left() + white_idx as f32 * key_width;
-                let midi_note = (self.base_octave + octave) * 12 + semitone as u8;
-                keys.push(KeyRect {
-                    rect: egui::Rect::from_min_size(
-                        egui::pos2(x, rect.top()),
-                        egui::vec2(key_width, white_height),
-                    ),
-                    midi_note,
-                    is_black: false,
-                });
-                white_idx += 1;
-            }
-        }
+        // Mouse interaction state machine:
+        // - Pointer down on a key → note_on
+        // - Pointer dragged to a different key → note_off old, note_on new (glissando)
+        // - Pointer released or left the keyboard → note_off
+        let pointer_down = response.is_pointer_button_down_on();
 
-        // Black keys (drawn on top)
-        white_idx = 0;
-        for octave in 0..self.num_octaves {
-            for (semitone, &is_black) in IS_BLACK.iter().enumerate() {
-                if is_black {
-                    // Black keys are positioned between white keys
-                    let x = rect.left() + white_idx as f32 * key_width - black_width / 2.0;
-                    let midi_note = (self.base_octave + octave) * 12 + semitone as u8;
-                    keys.push(KeyRect {
-                        rect: egui::Rect::from_min_size(
-                            egui::pos2(x, rect.top()),
-                            egui::vec2(black_width, black_height),
-                        ),
-                        midi_note,
-                        is_black: true,
-                    });
-                } else {
-                    white_idx += 1;
-                }
-            }
-        }
-
-        // Hit test: check pointer position
-        if let Some(pos) = response.interact_pointer_pos() {
-            // Check black keys first (they're on top)
-            let mut hit_note = None;
-            for key in keys.iter().rev() {
-                if key.rect.contains(pos) {
-                    hit_note = Some(key.midi_note);
-                    break;
-                }
-            }
-
-            if response.drag_started() {
-                if let Some(note) = hit_note {
+        if pointer_down {
+            if let Some(note) = hit_note {
+                if *mouse_note != Some(note) {
+                    // Release previous mouse note if any
+                    if let Some(prev) = *mouse_note {
+                        result.note_off = Some(prev);
+                    }
+                    // Press new note
                     result.note_on = Some(note);
-                }
-            } else if response.drag_stopped() {
-                if let Some(note) = hit_note {
-                    result.note_off = Some(note);
+                    *mouse_note = Some(note);
                 }
             }
-        }
-
-        if response.drag_stopped() && result.note_off.is_none() {
-            // Release whatever was held from this keyboard
-            // The app will handle this based on held_keys
-            if let Some(&last) = held_keys.last() {
-                result.note_off = Some(last);
-            }
+        } else if mouse_note.is_some() {
+            // Pointer released — release the mouse note
+            result.note_off = *mouse_note;
+            *mouse_note = None;
         }
 
         // Draw white keys
@@ -168,5 +125,70 @@ impl PianoKeyboard {
         }
 
         result
+    }
+
+    fn build_key_rects(
+        &self,
+        rect: egui::Rect,
+        key_width: f32,
+        white_height: f32,
+        black_height: f32,
+        black_width: f32,
+    ) -> Vec<KeyRect> {
+        let mut keys = Vec::new();
+
+        // White keys
+        let mut white_idx = 0;
+        for octave in 0..self.num_octaves {
+            for (semitone, &is_black) in IS_BLACK.iter().enumerate() {
+                if is_black {
+                    continue;
+                }
+                let x = rect.left() + white_idx as f32 * key_width;
+                let midi_note = (self.base_octave + octave) * 12 + semitone as u8;
+                keys.push(KeyRect {
+                    rect: egui::Rect::from_min_size(
+                        egui::pos2(x, rect.top()),
+                        egui::vec2(key_width, white_height),
+                    ),
+                    midi_note,
+                    is_black: false,
+                });
+                white_idx += 1;
+            }
+        }
+
+        // Black keys (appended after white so they're checked first in reverse)
+        white_idx = 0;
+        for octave in 0..self.num_octaves {
+            for (semitone, &is_black) in IS_BLACK.iter().enumerate() {
+                if is_black {
+                    let x = rect.left() + white_idx as f32 * key_width - black_width / 2.0;
+                    let midi_note = (self.base_octave + octave) * 12 + semitone as u8;
+                    keys.push(KeyRect {
+                        rect: egui::Rect::from_min_size(
+                            egui::pos2(x, rect.top()),
+                            egui::vec2(black_width, black_height),
+                        ),
+                        midi_note,
+                        is_black: true,
+                    });
+                } else {
+                    white_idx += 1;
+                }
+            }
+        }
+
+        keys
+    }
+
+    fn hit_test(&self, keys: &[KeyRect], pos: egui::Pos2) -> Option<u8> {
+        // Check black keys first (they're at the end and drawn on top)
+        for key in keys.iter().rev() {
+            if key.rect.contains(pos) {
+                return Some(key.midi_note);
+            }
+        }
+        None
     }
 }
