@@ -181,6 +181,160 @@ impl MameSynthApp {
             }
         }
     }
+
+    /// F11: Read test command from /tmp/mame-synth-input.txt and execute it.
+    /// F12: Dump current state to /tmp/mame-synth-state.txt.
+    fn handle_test_commands(&mut self, ctx: &egui::Context) {
+        let f11 = ctx.input(|i| {
+            i.events.iter().any(|e| {
+                matches!(
+                    e,
+                    egui::Event::Key {
+                        key: egui::Key::F11,
+                        pressed: true,
+                        ..
+                    }
+                )
+            })
+        });
+        let f12 = ctx.input(|i| {
+            i.events.iter().any(|e| {
+                matches!(
+                    e,
+                    egui::Event::Key {
+                        key: egui::Key::F12,
+                        pressed: true,
+                        ..
+                    }
+                )
+            })
+        });
+
+        if f11 {
+            if let Ok(cmd) = std::fs::read_to_string("/tmp/mame-synth-input.txt") {
+                self.execute_test_command(cmd.trim());
+            }
+        }
+
+        if f12 {
+            self.dump_state();
+        }
+    }
+
+    fn execute_test_command(&mut self, cmd: &str) {
+        log::info!("Test command: {}", cmd);
+        let parts: Vec<&str> = cmd.split_whitespace().collect();
+        match parts.first().copied() {
+            Some("switch-chip") => {
+                if let Some(name) = parts.get(1) {
+                    let chip = match *name {
+                        "sn76489" => Some(ChipId::Sn76489),
+                        "ym2612" => Some(ChipId::Ym2612),
+                        "sid6581" => Some(ChipId::Sid6581),
+                        _ => None,
+                    };
+                    if let Some(id) = chip {
+                        self.switch_chip(id);
+                    }
+                }
+            }
+            Some("note-on") => {
+                if let (Some(note), Some(vel)) = (
+                    parts.get(1).and_then(|s| s.parse::<u8>().ok()),
+                    parts.get(2).and_then(|s| s.parse::<u8>().ok()),
+                ) {
+                    self.held_keys.push(note);
+                    let _ = self.audio_tx.push(AudioMessage::NoteOn {
+                        note,
+                        velocity: vel,
+                    });
+                }
+            }
+            Some("note-off") => {
+                if let Some(note) = parts.get(1).and_then(|s| s.parse::<u8>().ok()) {
+                    self.held_keys.retain(|&n| n != note);
+                    let _ = self.audio_tx.push(AudioMessage::NoteOff { note });
+                }
+            }
+            Some("set-param") => {
+                if let (Some(id), Some(val)) = (
+                    parts.get(1).and_then(|s| s.parse::<u32>().ok()),
+                    parts.get(2).and_then(|s| s.parse::<f32>().ok()),
+                ) {
+                    let _ = self.audio_tx.push(AudioMessage::SetParam {
+                        param_id: id,
+                        value: val,
+                    });
+                    // Update local GUI state
+                    if let Some(idx) = self.param_infos.iter().position(|p| p.id == id) {
+                        self.param_values[idx] = val;
+                    }
+                }
+            }
+            Some("set-voice-mode") => {
+                if let Some(mode_name) = parts.get(1) {
+                    let mode = match *mode_name {
+                        "mono" => Some(VoiceMode::Mono),
+                        "poly" => Some(VoiceMode::Poly),
+                        "unison" => {
+                            let detune = parts
+                                .get(2)
+                                .and_then(|s| s.parse::<f32>().ok())
+                                .unwrap_or(15.0);
+                            Some(VoiceMode::Unison {
+                                detune_cents: detune,
+                            })
+                        }
+                        _ => None,
+                    };
+                    if let Some(m) = mode {
+                        let _ = self.audio_tx.push(AudioMessage::SetVoiceMode(m));
+                        match m {
+                            VoiceMode::Mono => self.voice_mode_index = 1,
+                            VoiceMode::Poly => self.voice_mode_index = 0,
+                            VoiceMode::Unison { detune_cents } => {
+                                self.voice_mode_index = 2;
+                                self.unison_detune = detune_cents;
+                            }
+                        }
+                    }
+                }
+            }
+            Some("reset") => {
+                let _ = self.audio_tx.push(AudioMessage::Reset);
+            }
+            _ => {
+                log::warn!("Unknown test command: {}", cmd);
+            }
+        }
+    }
+
+    fn dump_state(&self) {
+        let mut lines = Vec::new();
+        lines.push(format!("chip={}", self.active_chip.display_name()));
+        lines.push(format!("voice_mode={}", match self.voice_mode_index {
+            0 => "poly",
+            1 => "mono",
+            2 => "unison",
+            _ => "unknown",
+        }));
+        if self.voice_mode_index == 2 {
+            lines.push(format!("unison_detune={:.1}", self.unison_detune));
+        }
+        lines.push(format!("octave={}", self.keyboard_octave));
+        lines.push(format!("held_keys={}", self.held_keys.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(",")));
+        lines.push(format!("peak_left={:.4}", self.peak_left));
+        lines.push(format!("peak_right={:.4}", self.peak_right));
+        lines.push(format!("num_params={}", self.param_infos.len()));
+        for (i, info) in self.param_infos.iter().enumerate() {
+            lines.push(format!("param_{}={:.2}", info.id, self.param_values[i]));
+        }
+        let content = lines.join("\n");
+        if let Err(e) = std::fs::write("/tmp/mame-synth-state.txt", &content) {
+            log::error!("Failed to dump state: {}", e);
+        }
+        log::info!("State dumped to /tmp/mame-synth-state.txt");
+    }
 }
 
 impl eframe::App for MameSynthApp {
@@ -192,6 +346,7 @@ impl eframe::App for MameSynthApp {
 
         self.drain_gui_messages();
         self.handle_computer_keyboard(ctx);
+        self.handle_test_commands(ctx);
 
         // Decay VU meters smoothly
         let decay = 0.85f32;

@@ -18,3 +18,6 @@ eframe = { version = "0.31", default-features = true }
 log = { workspace = true }
 env_logger = { workspace = true }
 rtrb = "0.3"
+
+[dev-dependencies]
+libc = "0.2"
