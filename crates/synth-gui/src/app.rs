@@ -307,6 +307,10 @@ impl MameSynthApp {
                         "sn76489" => Some(ChipId::Sn76489),
                         "ym2612" => Some(ChipId::Ym2612),
                         "sid6581" => Some(ChipId::Sid6581),
+                        "ay8910" => Some(ChipId::Ay8910),
+                        "2a03" => Some(ChipId::Ricoh2a03),
+                        "pokey" => Some(ChipId::Pokey),
+                        "ym2151" => Some(ChipId::Ym2151),
                         _ => None,
                     };
                     if let Some(id) = chip {
@@ -722,6 +726,22 @@ impl eframe::App for MameSynthApp {
                     panels::ym2612_panel::show_algorithm_diagram(ui, algo_value as u8);
                 }
                 ChipId::Sid6581 => panels::sid6581_panel::show_chip_header(ui),
+                ChipId::Ym2151 => {
+                    panels::ym2612_panel::show_chip_header(ui); // reuse FM header for now
+                    let algo_value = self.param_values.first().copied().unwrap_or(0.0);
+                    panels::ym2612_panel::show_algorithm_diagram(ui, algo_value as u8);
+                }
+                _ => {
+                    // Generic header for new chips
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new(self.active_chip.display_name())
+                                .strong()
+                                .size(16.0),
+                        );
+                    });
+                    ui.separator();
+                }
             }
 
             // Scrollable rack panel

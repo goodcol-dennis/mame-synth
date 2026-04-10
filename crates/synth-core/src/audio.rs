@@ -1,11 +1,15 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use rtrb::{Consumer, Producer};
 
+use crate::ay8910::Ay8910;
 use crate::chip::{ChipId, StereoSample};
 use crate::messages::{AudioMessage, GuiMessage};
+use crate::pokey::Pokey;
+use crate::ricoh2a03::Ricoh2a03;
 use crate::sid6581::Sid6581;
 use crate::sn76489::Sn76489;
 use crate::voice::ChipBank;
+use crate::ym2151::Ym2151;
 use crate::ym2612::Ym2612;
 
 struct AudioState {
@@ -31,6 +35,10 @@ fn create_bank(chip_id: ChipId, count: usize, sample_rate: u32) -> ChipBank {
                 ChipId::Sn76489 => Box::new(Sn76489::new(sample_rate)),
                 ChipId::Ym2612 => Box::new(Ym2612::new(sample_rate)),
                 ChipId::Sid6581 => Box::new(Sid6581::new(sample_rate)),
+                ChipId::Ay8910 => Box::new(Ay8910::new(sample_rate)),
+                ChipId::Ricoh2a03 => Box::new(Ricoh2a03::new(sample_rate)),
+                ChipId::Pokey => Box::new(Pokey::new(sample_rate)),
+                ChipId::Ym2151 => Box::new(Ym2151::new(sample_rate)),
             }
         })
         .collect();
@@ -64,11 +72,10 @@ impl AudioEngine {
         };
 
         let mut state = AudioState {
-            banks: vec![
-                create_bank(ChipId::Sn76489, 1, sample_rate),
-                create_bank(ChipId::Ym2612, 1, sample_rate),
-                create_bank(ChipId::Sid6581, 1, sample_rate),
-            ],
+            banks: ChipId::all()
+                .iter()
+                .map(|id| create_bank(*id, 1, sample_rate))
+                .collect(),
             active_bank_index: 0,
             consumer: msg_consumer,
             gui_producer,

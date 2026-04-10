@@ -4,11 +4,15 @@
 //! cpal or speakers. Analogous to b1edit's headless Wayland compositor —
 //! runs the real audio logic in a controlled environment.
 
+use synth_core::ay8910::Ay8910;
 use synth_core::chip::{ChipId, StereoSample, VoiceMode};
 use synth_core::messages::AudioMessage;
+use synth_core::pokey::Pokey;
+use synth_core::ricoh2a03::Ricoh2a03;
 use synth_core::sid6581::Sid6581;
 use synth_core::sn76489::Sn76489;
 use synth_core::voice::ChipBank;
+use synth_core::ym2151::Ym2151;
 use synth_core::ym2612::Ym2612;
 
 const SAMPLE_RATE: u32 = 44100;
@@ -26,11 +30,10 @@ impl AudioSession {
     fn new() -> Self {
         let (tx, rx) = rtrb::RingBuffer::<AudioMessage>::new(1024);
         AudioSession {
-            banks: vec![
-                Self::make_bank(ChipId::Sn76489, 1),
-                Self::make_bank(ChipId::Ym2612, 1),
-                Self::make_bank(ChipId::Sid6581, 1),
-            ],
+            banks: ChipId::all()
+                .iter()
+                .map(|id| Self::make_bank(*id, 1))
+                .collect(),
             active_bank: 0,
             tx,
             rx,
@@ -44,6 +47,10 @@ impl AudioSession {
                     ChipId::Sn76489 => Box::new(Sn76489::new(SAMPLE_RATE)),
                     ChipId::Ym2612 => Box::new(Ym2612::new(SAMPLE_RATE)),
                     ChipId::Sid6581 => Box::new(Sid6581::new(SAMPLE_RATE)),
+                    ChipId::Ay8910 => Box::new(Ay8910::new(SAMPLE_RATE)),
+                    ChipId::Ricoh2a03 => Box::new(Ricoh2a03::new(SAMPLE_RATE)),
+                    ChipId::Pokey => Box::new(Pokey::new(SAMPLE_RATE)),
+                    ChipId::Ym2151 => Box::new(Ym2151::new(SAMPLE_RATE)),
                 }
             })
             .collect();

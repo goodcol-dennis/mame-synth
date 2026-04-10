@@ -74,6 +74,10 @@ fn chip_id_to_str(id: ChipId) -> &'static str {
         ChipId::Sn76489 => "sn76489",
         ChipId::Ym2612 => "ym2612",
         ChipId::Sid6581 => "sid6581",
+        ChipId::Ay8910 => "ay8910",
+        ChipId::Ricoh2a03 => "2a03",
+        ChipId::Pokey => "pokey",
+        ChipId::Ym2151 => "ym2151",
     }
 }
 
@@ -82,6 +86,10 @@ fn str_to_chip_id(s: &str) -> Option<ChipId> {
         "sn76489" => Some(ChipId::Sn76489),
         "ym2612" => Some(ChipId::Ym2612),
         "sid6581" => Some(ChipId::Sid6581),
+        "ay8910" => Some(ChipId::Ay8910),
+        "2a03" => Some(ChipId::Ricoh2a03),
+        "pokey" => Some(ChipId::Pokey),
+        "ym2151" => Some(ChipId::Ym2151),
         _ => None,
     }
 }

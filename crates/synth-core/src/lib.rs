@@ -1,11 +1,16 @@
 pub mod audio;
+pub mod ay8910;
 pub mod chip;
 pub mod messages;
 pub mod midi;
 pub mod midi_file;
 pub mod patch;
+pub mod pokey;
+pub mod ricoh2a03;
 pub mod sid6581;
 pub mod sn76489;
 pub mod voice;
+pub mod ym2151;
+mod ym2151_ffi;
 pub mod ym2612;
 mod ym2612_ffi;

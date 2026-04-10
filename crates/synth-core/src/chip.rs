@@ -4,11 +4,23 @@ pub enum ChipId {
     Sn76489,
     Ym2612,
     Sid6581,
+    Ay8910,
+    Ricoh2a03,
+    Pokey,
+    Ym2151,
 }
 
 impl ChipId {
     pub fn all() -> &'static [ChipId] {
-        &[ChipId::Sn76489, ChipId::Ym2612, ChipId::Sid6581]
+        &[
+            ChipId::Sn76489,
+            ChipId::Ym2612,
+            ChipId::Sid6581,
+            ChipId::Ay8910,
+            ChipId::Ricoh2a03,
+            ChipId::Pokey,
+            ChipId::Ym2151,
+        ]
     }
 
     pub fn display_name(&self) -> &'static str {
@@ -16,6 +28,10 @@ impl ChipId {
             ChipId::Sn76489 => "SN76489 (PSG)",
             ChipId::Ym2612 => "YM2612 (FM)",
             ChipId::Sid6581 => "SID 6581 (C64)",
+            ChipId::Ay8910 => "AY-3-8910 (PSG)",
+            ChipId::Ricoh2a03 => "2A03 (NES)",
+            ChipId::Pokey => "POKEY (Atari)",
+            ChipId::Ym2151 => "YM2151 (OPM)",
         }
     }
 }
@@ -118,5 +134,9 @@ pub fn param_info_for_chip(id: ChipId) -> Vec<ParamInfo> {
         ChipId::Sn76489 => crate::sn76489::sn76489_param_info(),
         ChipId::Ym2612 => crate::ym2612::ym2612_param_info(),
         ChipId::Sid6581 => crate::sid6581::sid_param_info(),
+        ChipId::Ay8910 => crate::ay8910::ay8910_param_info(),
+        ChipId::Ricoh2a03 => crate::ricoh2a03::ricoh2a03_param_info(),
+        ChipId::Pokey => crate::pokey::pokey_param_info(),
+        ChipId::Ym2151 => crate::ym2151::ym2151_param_info(),
     }
 }
