@@ -8,7 +8,10 @@
       "Bash(git -C /home/dennis/projects/mame-synth stash pop)",
       "Bash(git -C /home/dennis/projects/mame-synth checkout -b dev/macros-patches-polish)",
       "Bash(cargo check:*)",
-      "Bash(git -C /home/dennis/projects/mame-synth commit --no-verify -m ':*)"
+      "Bash(git -C /home/dennis/projects/mame-synth commit --no-verify -m ':*)",
+      "Bash(git -C /home/dennis/projects/mame-synth merge dev/macros-patches-polish)",
+      "Bash(ls /home/dennis/projects/mame-synth/*.md)",
+      "Bash(git -C /home/dennis/projects/mame-synth checkout -b dev/audit-recommendations)"
     ],
     "additionalDirectories": [
       "/run/user/1000"
