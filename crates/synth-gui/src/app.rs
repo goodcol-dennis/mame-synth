@@ -218,19 +218,23 @@ impl eframe::App for MameSynthApp {
         self.peak_left *= decay;
         self.peak_right *= decay;
 
-        // Poll MIDI player for events
+        // Poll MIDI player for events — also light up keyboard
         let was_playing = self.midi_player.is_playing();
         let midi_events = self.midi_player.poll();
-        for event in midi_events {
+        for event in &midi_events {
             if event.is_on {
                 let _ = self.audio_tx.push(AudioMessage::NoteOn {
                     note: event.note,
                     velocity: event.velocity,
                 });
+                if !self.held_keys.contains(&event.note) {
+                    self.held_keys.push(event.note);
+                }
             } else {
                 let _ = self
                     .audio_tx
                     .push(AudioMessage::NoteOff { note: event.note });
+                self.held_keys.retain(|&n| n != event.note);
             }
         }
         // When playback ends, release all notes

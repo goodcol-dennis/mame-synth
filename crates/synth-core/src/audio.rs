@@ -79,42 +79,13 @@ impl AudioEngine {
             default_config.sample_format()
         );
 
-        // Try progressively larger buffer sizes until one works
-        let buffer_sizes = [128, 256, 512, 1024];
-        let mut chosen_size = None;
-        for &size in &buffer_sizes {
-            let test_config = cpal::StreamConfig {
-                channels: 2,
-                sample_rate: cpal::SampleRate(sample_rate),
-                buffer_size: cpal::BufferSize::Fixed(size),
-            };
-            if device
-                .build_output_stream(&test_config, |_: &mut [f32], _| {}, |_| {}, None)
-                .is_ok()
-            {
-                chosen_size = Some(size);
-                break;
-            }
-        }
-
-        let config = if let Some(size) = chosen_size {
-            log::info!(
-                "Audio buffer: {} frames ({:.1}ms latency)",
-                size,
-                size as f64 / sample_rate as f64 * 1000.0
-            );
-            cpal::StreamConfig {
-                channels: 2,
-                sample_rate: cpal::SampleRate(sample_rate),
-                buffer_size: cpal::BufferSize::Fixed(size),
-            }
-        } else {
-            log::info!("No fixed buffer size worked, using default");
-            cpal::StreamConfig {
-                channels: 2,
-                sample_rate: cpal::SampleRate(sample_rate),
-                buffer_size: cpal::BufferSize::Default,
-            }
+        // Use Default buffer — Fixed sizes pass the probe but can silently
+        // kill the real callback on some PipeWire/ALSA configurations.
+        // The PIPEWIRE_QUANTUM env var (set in main.rs) hints for low latency.
+        let config = cpal::StreamConfig {
+            channels: 2,
+            sample_rate: cpal::SampleRate(sample_rate),
+            buffer_size: cpal::BufferSize::Default,
         };
 
         let mut state = AudioState {
