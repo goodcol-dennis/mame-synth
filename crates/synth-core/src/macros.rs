@@ -54,6 +54,12 @@ pub struct MacroState {
     duty_pos: usize,
 }
 
+impl Default for MacroState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MacroState {
     pub fn new() -> Self {
         MacroState {

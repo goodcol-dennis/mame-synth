@@ -37,6 +37,7 @@ pub struct MameSynthApp {
     pub(crate) unison_detune: f32,
     pub(crate) chip_count: u8,
     pub(crate) mouse_note: Option<u8>,
+    pub(crate) macro_index: u8,
     pub(crate) patch_bank: PatchBank,
     pub(crate) selected_patch: Option<usize>,
     pub(crate) save_patch_name: String,
@@ -96,6 +97,7 @@ impl MameSynthApp {
             unison_detune: 15.0,
             chip_count: 1,
             mouse_note: None,
+            macro_index: 255,
             patch_bank: {
                 let dir = dirs();
                 let mut bank = PatchBank::new(dir);
@@ -121,6 +123,7 @@ impl MameSynthApp {
         }
         self.active_chip = new_chip;
         self.chip_count = 1;
+        self.macro_index = 255;
         self.param_infos = param_info_for_chip(new_chip);
         self.param_values = self
             .param_infos
@@ -356,6 +359,46 @@ impl eframe::App for MameSynthApp {
                     "({} × {} = {} voices)",
                     self.chip_count, vpc, total
                 ));
+
+                ui.separator();
+                let macro_names = [
+                    "Off",
+                    "Pluck",
+                    "Minor Arp",
+                    "Major Arp",
+                    "Octave Pulse",
+                    "Kick Drum",
+                    "Vibrato",
+                    "Swell",
+                ];
+                let current_macro = if self.macro_index == 255 {
+                    "Off"
+                } else {
+                    macro_names
+                        .get(self.macro_index as usize + 1)
+                        .unwrap_or(&"Off")
+                };
+                egui::ComboBox::from_id_salt("macro_select")
+                    .selected_text(current_macro)
+                    .width(100.0)
+                    .show_ui(ui, |ui| {
+                        if ui
+                            .selectable_label(self.macro_index == 255, "Off")
+                            .clicked()
+                        {
+                            self.macro_index = 255;
+                            let _ = self.audio_tx.push(AudioMessage::SetMacro(255));
+                        }
+                        for (i, name) in macro_names[1..].iter().enumerate() {
+                            if ui
+                                .selectable_label(self.macro_index == i as u8, *name)
+                                .clicked()
+                            {
+                                self.macro_index = i as u8;
+                                let _ = self.audio_tx.push(AudioMessage::SetMacro(i as u8));
+                            }
+                        }
+                    });
             });
         });
 

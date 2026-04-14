@@ -20,6 +20,8 @@ pub enum AudioMessage {
     Reset,
     /// Set number of chip instances in the active bank (1-4).
     SetChipCount(u8),
+    /// Set active macro by index (255 = none/off).
+    SetMacro(u8),
 }
 
 /// Messages from audio thread back to GUI (for visualization).

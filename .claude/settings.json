@@ -1,10 +1,17 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(grep -v \"^\\\\s*$\")",
+      "Bash(git -C /home/dennis/projects/mame-synth checkout main)",
+      "Bash(git -C /home/dennis/projects/mame-synth merge dev/latency-stacking-macros-e2e)",
+      "Bash(git -C /home/dennis/projects/mame-synth stash)",
+      "Bash(git -C /home/dennis/projects/mame-synth stash pop)",
+      "Bash(git -C /home/dennis/projects/mame-synth checkout -b dev/macros-patches-polish)",
+      "Bash(cargo check:*)",
+      "Bash(git -C /home/dennis/projects/mame-synth commit --no-verify -m ':*)"
+    ],
     "additionalDirectories": [
       "/run/user/1000"
-    ],
-    "allow": [
-      "Bash(grep -v \"^\\\\s*$\")"
     ]
   }
 }

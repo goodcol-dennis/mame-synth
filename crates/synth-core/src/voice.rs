@@ -1,4 +1,5 @@
 use crate::chip::{ChipId, ParamInfo, SoundChip, StereoSample, VoiceMode};
+use crate::macros::{InstrumentMacro, MacroState};
 
 /// Tracks which note each voice is playing and when it was triggered.
 #[derive(Debug, Clone, Copy)]
@@ -157,6 +158,14 @@ pub struct ChipBank {
     voices_per_chip: usize,
     allocator: VoiceAllocator,
     mix_buffer: Vec<StereoSample>,
+    // Macro engine
+    active_macro: Option<InstrumentMacro>,
+    macro_states: Vec<MacroState>,
+    voice_base_notes: Vec<Option<u8>>,
+    voice_velocities: Vec<u8>,
+    voice_detunes: Vec<f32>,
+    macro_sample_counter: u32,
+    macro_tick_interval: u32, // samples per macro tick (~735 for 60Hz)
 }
 
 impl ChipBank {
@@ -169,6 +178,13 @@ impl ChipBank {
             voices_per_chip,
             allocator: VoiceAllocator::new(total_voices),
             mix_buffer: Vec::new(),
+            active_macro: None,
+            macro_states: vec![MacroState::new(); total_voices],
+            voice_base_notes: vec![None; total_voices],
+            voice_velocities: vec![0; total_voices],
+            voice_detunes: vec![0.0; total_voices],
+            macro_sample_counter: 0,
+            macro_tick_interval: 735, // 44100 / 60 ≈ 735
         }
     }
 
@@ -192,6 +208,18 @@ impl ChipBank {
         self.allocator.mode()
     }
 
+    pub fn set_macro(&mut self, mac: Option<InstrumentMacro>) {
+        self.active_macro = mac;
+        // Reset all macro states
+        for ms in &mut self.macro_states {
+            *ms = MacroState::new();
+        }
+    }
+
+    pub fn active_macro_name(&self) -> Option<&str> {
+        self.active_macro.as_ref().map(|m| m.name.as_str())
+    }
+
     pub fn param_info(&self) -> Vec<ParamInfo> {
         self.chips[0].param_info()
     }
@@ -213,6 +241,13 @@ impl ChipBank {
             let chip_idx = voice_idx / self.voices_per_chip;
             let local_voice = voice_idx % self.voices_per_chip;
             self.chips[chip_idx].voice_on(local_voice, note, velocity, detune);
+            // Track for macro modulation
+            if voice_idx < self.voice_base_notes.len() {
+                self.voice_base_notes[voice_idx] = Some(note);
+                self.voice_velocities[voice_idx] = velocity;
+                self.voice_detunes[voice_idx] = detune;
+                self.macro_states[voice_idx].trigger();
+            }
         }
     }
 
@@ -222,22 +257,39 @@ impl ChipBank {
             let chip_idx = voice_idx / self.voices_per_chip;
             let local_voice = voice_idx % self.voices_per_chip;
             self.chips[chip_idx].voice_off(local_voice);
+            if *voice_idx < self.macro_states.len() {
+                self.macro_states[*voice_idx].release();
+                self.voice_base_notes[*voice_idx] = None;
+            }
         }
 
         // Mono retrigger
         if releases.is_empty() {
             if let Some(retrigger_note) = self.allocator.mono_retrigger_note() {
                 self.chips[0].voice_on(0, retrigger_note, 100, 0.0);
+                if !self.voice_base_notes.is_empty() {
+                    self.voice_base_notes[0] = Some(retrigger_note);
+                    self.macro_states[0].trigger();
+                }
             }
         }
     }
 
     pub fn generate_samples(&mut self, output: &mut [StereoSample]) {
+        // Tick macros at frame rate (~60Hz) and apply modulation
+        if let Some(mac) = &self.active_macro {
+            let mac = mac.clone(); // clone to avoid borrow conflict
+            self.macro_sample_counter += output.len() as u32;
+            while self.macro_sample_counter >= self.macro_tick_interval {
+                self.macro_sample_counter -= self.macro_tick_interval;
+                self.apply_macro_tick(&mac);
+            }
+        }
+
         // First chip writes directly
         self.chips[0].generate_samples(output);
 
         if self.chips.len() > 1 {
-            // Additional chips mix into the output
             self.mix_buffer
                 .resize(output.len(), StereoSample::default());
             for chip in &mut self.chips[1..] {
@@ -247,11 +299,39 @@ impl ChipBank {
                     out.right += mix.right;
                 }
             }
-            // Normalize by chip count to prevent clipping
             let scale = 1.0 / self.chips.len() as f32;
             for s in output.iter_mut() {
                 s.left *= scale;
                 s.right *= scale;
+            }
+        }
+    }
+
+    fn apply_macro_tick(&mut self, mac: &InstrumentMacro) {
+        let total_voices = self.voices_per_chip * self.chips.len();
+        for voice_idx in 0..total_voices {
+            if self.voice_base_notes[voice_idx].is_none() {
+                continue;
+            }
+            let out = self.macro_states[voice_idx].tick(mac);
+            let base_note = self.voice_base_notes[voice_idx].unwrap();
+            let velocity = self.voice_velocities[voice_idx];
+            let detune = self.voice_detunes[voice_idx];
+
+            let chip_idx = voice_idx / self.voices_per_chip;
+            let local_voice = voice_idx % self.voices_per_chip;
+
+            // Apply arpeggio: retrigger voice with offset note
+            if let Some(arp) = out.arp_semitones {
+                let new_note = (base_note as i16 + arp as i16).clamp(0, 127) as u8;
+                self.chips[chip_idx].voice_on(local_voice, new_note, velocity, detune);
+            }
+
+            // Apply volume modulation (for chips that support per-voice volume)
+            // This is chip-specific — for PSGs, volume is the primary control
+            if let Some(_vol) = out.volume {
+                // TODO: apply volume to chip (needs per-voice volume API)
+                // For now, macros with volume sequences use arpeggio only
             }
         }
     }

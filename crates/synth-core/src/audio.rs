@@ -3,6 +3,7 @@ use rtrb::{Consumer, Producer};
 
 use crate::ay8910::Ay8910;
 use crate::chip::{ChipId, StereoSample};
+use crate::macros;
 use crate::messages::{AudioMessage, GuiMessage};
 use crate::namco_wsg::NamcoWsg;
 use crate::pokey::Pokey;
@@ -27,6 +28,7 @@ struct AudioState {
     peak_left: f32,
     peak_right: f32,
     sample_rate: u32,
+    factory_macros: Vec<macros::InstrumentMacro>,
 }
 
 pub struct AudioEngine {
@@ -127,6 +129,7 @@ impl AudioEngine {
             peak_right: 0.0,
             first_callback: true,
             sample_rate,
+            factory_macros: macros::factory_macros(),
         };
 
         let stream = device.build_output_stream(
@@ -191,6 +194,13 @@ fn audio_callback(state: &mut AudioState, output: &mut [f32]) {
                 let chip_id = state.banks[state.active_bank_index].chip_id();
                 let new_bank = create_bank(chip_id, count as usize, state.sample_rate);
                 state.banks[state.active_bank_index] = new_bank;
+            }
+            AudioMessage::SetMacro(idx) => {
+                if idx == 255 {
+                    state.banks[state.active_bank_index].set_macro(None);
+                } else if let Some(mac) = state.factory_macros.get(idx as usize) {
+                    state.banks[state.active_bank_index].set_macro(Some(mac.clone()));
+                }
             }
             AudioMessage::PitchBend { .. } => {}
         }

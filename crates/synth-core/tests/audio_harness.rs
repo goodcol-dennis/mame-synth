@@ -101,6 +101,7 @@ impl AudioSession {
                     let chip_id = self.banks[self.active_bank].chip_id();
                     self.banks[self.active_bank] = Self::make_bank(chip_id, count as usize);
                 }
+                AudioMessage::SetMacro(_) => {} // macros tested separately
                 AudioMessage::PitchBend { .. } => {}
             }
         }

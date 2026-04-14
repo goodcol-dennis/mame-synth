@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "ollama": {
+      "command": "npx",
+      "args": ["-y", "ollama-mcp"],
+      "env": {
+        "OLLAMA_HOST": "http://192.168.1.242:11434"
+      }
+    }
+  }
+}
