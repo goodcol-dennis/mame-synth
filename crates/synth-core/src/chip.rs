@@ -31,6 +31,38 @@ impl ChipId {
         ]
     }
 
+    /// Synthesis type category for menu organization.
+    pub fn category(&self) -> &'static str {
+        match self {
+            ChipId::Sn76489 | ChipId::Ay8910 | ChipId::Ricoh2a03 | ChipId::Pokey => "PSG",
+            ChipId::Ym2612 | ChipId::Ym2151 | ChipId::Ym3812 | ChipId::Ymf262 => "FM",
+            ChipId::Scc | ChipId::NamcoWsg => "Wavetable",
+            ChipId::Sid6581 => "Synth",
+        }
+    }
+
+    /// Short name without the category suffix.
+    pub fn short_name(&self) -> &'static str {
+        match self {
+            ChipId::Sn76489 => "SN76489",
+            ChipId::Ym2612 => "YM2612",
+            ChipId::Sid6581 => "SID 6581",
+            ChipId::Ay8910 => "AY-3-8910",
+            ChipId::Ricoh2a03 => "2A03",
+            ChipId::Pokey => "POKEY",
+            ChipId::Ym2151 => "YM2151",
+            ChipId::Ym3812 => "YM3812",
+            ChipId::Ymf262 => "YMF262",
+            ChipId::Scc => "SCC",
+            ChipId::NamcoWsg => "Namco WSG",
+        }
+    }
+
+    /// Ordered categories for menu display.
+    pub fn categories() -> &'static [&'static str] {
+        &["PSG", "FM", "Wavetable", "Synth"]
+    }
+
     pub fn display_name(&self) -> &'static str {
         match self {
             ChipId::Sn76489 => "SN76489 (PSG)",

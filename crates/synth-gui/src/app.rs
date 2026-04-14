@@ -460,16 +460,37 @@ impl eframe::App for MameSynthApp {
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            // Chip selector + patch selector row
+            // Chip selector (categorized) + patch selector row
             ui.horizontal(|ui| {
-                for chip in ChipId::all() {
-                    let selected = *chip == self.active_chip;
-                    let text = egui::RichText::new(chip.display_name()).size(14.0).strong();
-                    if ui.selectable_label(selected, text).clicked() {
-                        self.switch_chip(*chip);
-                        self.selected_patch = None;
-                    }
-                }
+                // Chip dropdown organized by synthesis type
+                egui::ComboBox::from_id_salt("chip_selector")
+                    .selected_text(self.active_chip.display_name())
+                    .width(180.0)
+                    .show_ui(ui, |ui| {
+                        for &cat in ChipId::categories() {
+                            ui.label(
+                                egui::RichText::new(cat)
+                                    .strong()
+                                    .size(11.0)
+                                    .color(theme::ACCENT),
+                            );
+                            for chip in ChipId::all() {
+                                if chip.category() == cat {
+                                    if ui
+                                        .selectable_label(
+                                            *chip == self.active_chip,
+                                            chip.short_name(),
+                                        )
+                                        .clicked()
+                                    {
+                                        self.switch_chip(*chip);
+                                        self.selected_patch = None;
+                                    }
+                                }
+                            }
+                            ui.separator();
+                        }
+                    });
 
                 ui.separator();
 
