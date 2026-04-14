@@ -38,6 +38,7 @@ pub struct MameSynthApp {
     pub(crate) chip_count: u8,
     pub(crate) mouse_note: Option<u8>,
     pub(crate) macro_index: u8,
+    pub(crate) waveform_data: [f32; 128],
     pub(crate) patch_bank: PatchBank,
     pub(crate) selected_patch: Option<usize>,
     pub(crate) save_patch_name: String,
@@ -98,6 +99,7 @@ impl MameSynthApp {
             chip_count: 1,
             mouse_note: None,
             macro_index: 255,
+            waveform_data: [0.0; 128],
             patch_bank: {
                 let dir = dirs();
                 let mut bank = PatchBank::new(dir);
@@ -192,6 +194,9 @@ impl MameSynthApp {
                     // Take max so we don't miss transients between frames
                     self.peak_left = self.peak_left.max(left);
                     self.peak_right = self.peak_right.max(right);
+                }
+                GuiMessage::WaveformData { samples } => {
+                    self.waveform_data = samples;
                 }
             }
         }
@@ -540,6 +545,7 @@ impl eframe::App for MameSynthApp {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.add(VuMeter::new(self.peak_right, "R"));
                         ui.add(VuMeter::new(self.peak_left, "L"));
+                        ui.add(crate::widgets::waveform::Waveform::new(&self.waveform_data));
                     });
                 });
                 ui.add_space(4.0);

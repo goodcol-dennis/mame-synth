@@ -26,7 +26,10 @@ pub enum AudioMessage {
 
 /// Messages from audio thread back to GUI (for visualization).
 #[derive(Debug, Clone, Copy)]
+#[allow(clippy::large_enum_variant)]
 pub enum GuiMessage {
     /// Current peak level (linear, 0.0-1.0) for VU meter.
     PeakLevel { left: f32, right: f32 },
+    /// Waveform snapshot: 128 left-channel samples for the oscilloscope.
+    WaveformData { samples: [f32; 128] },
 }

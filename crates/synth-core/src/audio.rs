@@ -29,6 +29,8 @@ struct AudioState {
     peak_right: f32,
     sample_rate: u32,
     factory_macros: Vec<macros::InstrumentMacro>,
+    waveform_buffer: [f32; 128],
+    waveform_pos: usize,
 }
 
 pub struct AudioEngine {
@@ -130,6 +132,8 @@ impl AudioEngine {
             first_callback: true,
             sample_rate,
             factory_macros: macros::factory_macros(),
+            waveform_buffer: [0.0; 128],
+            waveform_pos: 0,
         };
 
         let stream = device.build_output_stream(
@@ -217,12 +221,26 @@ fn audio_callback(state: &mut AudioState, output: &mut [f32]) {
     let buf = &mut state.sample_buffer[..num_frames];
     state.banks[state.active_bank_index].generate_samples(buf);
 
-    // Interleave into output and track peaks
+    // Interleave into output, track peaks, and fill waveform buffer
+    let mut waveform_wrapped = false;
     for (i, sample) in buf.iter().enumerate() {
         output[i * 2] = sample.left;
         output[i * 2 + 1] = sample.right;
         state.peak_left = state.peak_left.max(sample.left.abs());
         state.peak_right = state.peak_right.max(sample.right.abs());
+
+        state.waveform_buffer[state.waveform_pos] = sample.left;
+        state.waveform_pos += 1;
+        if state.waveform_pos >= 128 {
+            state.waveform_pos = 0;
+            waveform_wrapped = true;
+        }
+    }
+
+    if waveform_wrapped {
+        let _ = state.gui_producer.push(GuiMessage::WaveformData {
+            samples: state.waveform_buffer,
+        });
     }
 
     // Send peak levels to GUI periodically

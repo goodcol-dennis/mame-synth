@@ -254,6 +254,12 @@ impl Ym2612 {
             // SL/RR
             self.write_reg(0, 0x80 + offset, (self.op_sl[op] << 4) | self.op_rr[op]);
         }
+
+        // Key-off all 6 channels so no operators are active at init.
+        // Channels 0-2 use values 0x00-0x02; channels 3-5 use 0x04-0x06.
+        for ch_val in [0x00u8, 0x01, 0x02, 0x04, 0x05, 0x06] {
+            self.write_reg(0, 0x28, ch_val);
+        }
     }
 
     fn generate_one_sample(&mut self) -> StereoSample {
@@ -487,5 +493,9 @@ impl SoundChip for Ym2612 {
         self.active_notes = [None; 6];
         self.phase_accumulator = 0.0;
         self.init_default_patch();
+        // Ensure all channels are silent after reset.
+        for ch_val in [0x00u8, 0x01, 0x02, 0x04, 0x05, 0x06] {
+            self.write_reg(0, 0x28, ch_val);
+        }
     }
 }

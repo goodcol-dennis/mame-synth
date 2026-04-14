@@ -34,6 +34,14 @@ Audio thread (cpal callback)
 | SN76489 (PSG) | Pure Rust | 3 tone + 1 noise | Sega Master System / Genesis |
 | YM2612 (FM) | YMFM C++ via FFI | 6 channels | Sega Genesis, 4-operator FM |
 | SID 6581 (C64) | Pure Rust | 3 voices | Triangle/saw/pulse/noise + ADSR |
+| AY-3-8910 (PSG) | Pure Rust | 3 + noise | ZX Spectrum, MSX, Atari ST |
+| Ricoh 2A03 (NES) | Pure Rust | 2 pulse + tri + noise | NES/Famicom APU |
+| POKEY (Atari) | Pure Rust | 4 channels | Atari 800, polynomial distortion |
+| YM2151 (OPM) | YMFM C++ via FFI | 8 channels | Arcade, Sharp X68000 |
+| YM3812 (OPL2) | YMFM C++ via FFI | 9 channels | AdLib, Sound Blaster |
+| YMF262 (OPL3) | YMFM C++ via FFI | 18 channels | Sound Blaster Pro 2 |
+| SCC (Konami) | Pure Rust | 5 channels | MSX cartridges, wavetable |
+| Namco WSG | Pure Rust | 3 channels | Pac-Man, wavetable |
 
 ## Key Abstractions
 
@@ -41,6 +49,7 @@ Audio thread (cpal callback)
 - **`ChipBank`** (`voice.rs`) — pools N chip instances, total voices = N × chip.num_voices()
 - **`VoiceAllocator`** (`voice.rs`) — Mono/Poly/Unison mode, handles note-to-voice mapping
 - **`AudioMessage`** (`messages.rs`) — lock-free commands from GUI→audio thread (all `Copy`)
+- **`InstrumentMacro`** (`macros.rs`) — arpeggio/volume/duty sequences at frame rate
 
 ## Adding a New Chip
 
@@ -51,7 +60,6 @@ See [CODEBASE.md](CODEBASE.md) for the full 7-step walkthrough. Summary:
 
 ## Known Issues
 
-- **Audio latency ~100ms**: `BufferSize::Default` gives ~4410 frames on this system. `Fixed(256)` silently kills the audio callback. Root cause: cpal ALSA backend + PipeWire compatibility. Workaround: none yet — needs investigation into PipeWire native backend or JACK.
 - **Wayland key repeat**: egui marks the initial keypress as `repeat: true` in some cases. Workaround: use raw `Event::Key` events, deduplicate per-key per-frame, take last state.
 - **Debug builds unusable**: Chip emulation is too slow in debug mode — audio underruns. Always use `--release`.
 
@@ -59,13 +67,9 @@ See [CODEBASE.md](CODEBASE.md) for the full 7-step walkthrough. Summary:
 
 | Gap | Severity | Status | Notes |
 |-----|----------|--------|-------|
-| Audio latency ~100ms | Medium | Open | cpal `Default` buffer is large. `Fixed(256)` crashes callback. Need PipeWire native or JACK investigation. |
-| YM2612 idle output (~0.06 peak) | Low | Open | `init_default_patch()` leaves operators producing background noise. Need key-off on all channels at init. |
-| E2E tests not passing in cage | Medium | Open | F11/F12 key injection timing issues with egui inside headless cage compositor. Tests scaffolded but need tuning. |
 | No CI pipeline | Low | Deferred | Pre-commit hook enforces locally. CI can wait until contributors join. |
 | rtrb SPSC limits MIDI input | Medium | Open | Can't connect hardware MIDI and GUI to same ring buffer. Need second channel or MPSC queue. |
-| No multi-chip stacking in GUI | Low | Planned | ChipBank supports it. GUI needs chip count spinner control. |
-| app.rs still 516 lines | Low | Acceptable | Down from 774. Remaining code is egui layout, hard to split further without readability loss. |
+| Macro volume modulation | Low | Open | Macro engine applies arpeggio but volume modulation needs per-voice volume API on chips. |
 
 ## YMFM FFI
 

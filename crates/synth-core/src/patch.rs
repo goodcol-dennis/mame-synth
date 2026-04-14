@@ -309,6 +309,62 @@ fn factory_presets() -> Vec<Patch> {
                 ("306".into(), 1.0),
             ]),
         },
+        // AY-3-8910 presets
+        Patch {
+            name: "ZX Spectrum Lead".into(),
+            chip: "ay8910".into(),
+            voice_mode: "mono".into(),
+            unison_detune: 0.0,
+            params: HashMap::from([("noise_period".into(), 0.0), ("noise_enable".into(), 0.0)]),
+        },
+        // Ricoh 2A03 presets
+        Patch {
+            name: "NES Pulse".into(),
+            chip: "2a03".into(),
+            voice_mode: "poly".into(),
+            unison_detune: 0.0,
+            params: HashMap::from([("pulse1_duty".into(), 2.0), ("pulse2_duty".into(), 1.0)]),
+        },
+        // POKEY presets
+        Patch {
+            name: "Atari Buzz".into(),
+            chip: "pokey".into(),
+            voice_mode: "poly".into(),
+            unison_detune: 0.0,
+            params: HashMap::from([("distortion".into(), 1.0)]),
+        },
+        // YM2151 presets
+        Patch {
+            name: "Arcade Brass".into(),
+            chip: "ym2151".into(),
+            voice_mode: "poly".into(),
+            unison_detune: 0.0,
+            params: HashMap::from([("algorithm".into(), 0.0), ("feedback".into(), 5.0)]),
+        },
+        // YM3812 (OPL2) presets
+        Patch {
+            name: "AdLib Organ".into(),
+            chip: "ym3812".into(),
+            voice_mode: "poly".into(),
+            unison_detune: 0.0,
+            params: HashMap::from([("algorithm".into(), 0.0), ("feedback".into(), 4.0)]),
+        },
+        // SCC presets
+        Patch {
+            name: "Gradius Wave".into(),
+            chip: "scc".into(),
+            voice_mode: "poly".into(),
+            unison_detune: 0.0,
+            params: HashMap::from([("waveform".into(), 3.0)]),
+        },
+        // Namco WSG presets
+        Patch {
+            name: "Pac-Man Bell".into(),
+            chip: "namco_wsg".into(),
+            voice_mode: "poly".into(),
+            unison_detune: 0.0,
+            params: HashMap::from([("waveform".into(), 0.0)]),
+        },
     ]
 }
 
